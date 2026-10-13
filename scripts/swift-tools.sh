@@ -1,5 +1,15 @@
 #!/bin/bash
 # Shared build flags. This file is sourced by the build/test scripts.
+swift_version="$(swift --version)"
+if [[ "$swift_version" =~ Swift\ version\ ([0-9]+) ]]; then
+    if (( ${BASH_REMATCH[1]} < 6 )); then
+        echo "MacRelay needs Swift 6 or later. Select Xcode 16+ or newer Command Line Tools, then try again." >&2
+        exit 2
+    fi
+else
+    echo "Could not read the Swift version. Check Apple's developer tools." >&2
+    exit 2
+fi
 build_flags=()
 testing_flags=()
 swift_help="$(swift build --help)"
