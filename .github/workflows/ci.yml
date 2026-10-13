@@ -1,0 +1,30 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check Swift tools
+        run: swift --version
+      - name: Test
+        run: ./scripts/test.sh
+      - name: Build app
+        run: ./scripts/build-app.sh
+      - name: Package development build
+        run: ditto -c -k --keepParent build/MacRelay.app build/MacRelay-${{ matrix.os }}.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MacRelay-${{ matrix.os }}-development
+          path: build/MacRelay-${{ matrix.os }}.zip
+          retention-days: 14
