@@ -7,7 +7,10 @@ struct MacRelayApp: App {
     @StateObject private var model = RelayModel()
     var body: some Scene {
         MenuBarExtra(
-            "MacRelay", systemImage: model.pendingText == nil ? "arrow.left.arrow.right" : "tray.fill"
+            "MacRelay",
+            systemImage: model.automaticFailed
+                ? "exclamationmark.triangle"
+                : model.pendingText == nil ? "arrow.left.arrow.right" : "tray.fill"
         ) {
             RelayPanel(model: model)
         }
@@ -29,19 +32,28 @@ struct RelayPanel: View {
                         Text("Your text. Between your Macs.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("v0.1").font(.caption).foregroundStyle(.secondary)
+                    Text("v0.2.6 test").font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("This Mac", selection: $model.role) {
                     ForEach(RelayModel.Role.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }.pickerStyle(.segmented).disabled(model.isSending)
                 Text(model.role == .sender ? "Use Send on your MacBook." : "Use Receive on your Mac mini.")
                     .font(.caption).foregroundStyle(.secondary)
-                if model.role == .sender { senderControls } else { receiverControls }
-                Divider()
                 Text(model.status).font(.callout).fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Status: \(model.status)")
+                automaticControls
+                if model.role == .sender {
+                    if model.senderPaired {
+                        DisclosureGroup("Manual transfer and pairing") { senderControls }
+                    } else {
+                        senderControls
+                    }
+                } else {
+                    receiverControls
+                }
+                Divider()
                 Text(model.hotKeyStatus).font(.caption).foregroundStyle(.secondary)
-                Text("Text stays in memory. Receiving does not change your clipboard.")
+                Text("No saved text history. Automatic mode starts off each time you open MacRelay.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
@@ -69,6 +81,58 @@ struct RelayPanel: View {
             )
         }
     }
+    private var automaticControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Wispr through Screen Sharing").font(.headline)
+            Text("Experimental — needs a live dictation test.").font(.caption).foregroundStyle(.secondary)
+            if model.role == .sender, !model.sourceWindows.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Receiver: \(model.sourceReceiverName ?? "Paired Mac")", systemImage: "lock.shield")
+                    Text("Choose the Screen Sharing window showing this Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Picker("Window", selection: $model.selectedSourceWindowID) {
+                        Text("Choose window").tag(UUID?.none)
+                        ForEach(model.sourceWindows) { window in
+                            Text(window.label).tag(Optional(window.id))
+                        }
+                    }.disabled(model.automaticEnabled || model.isSending)
+                    HStack {
+                        Button("Show window") { model.showSelectedSourceWindow() }
+                            .disabled(model.selectedSourceWindowID == nil || model.automaticEnabled)
+                        Button("Change window") { model.prepareSourceWindows() }.disabled(model.isSending)
+                    }.font(.caption)
+                }
+            }
+            Button(
+                model.automaticStarting
+                    ? "Checking…"
+                    : model.automaticEnabled
+                        ? "Turn automatic mode off"
+                        : model.role == .sender
+                            ? (model.sourceWindows.isEmpty
+                                ? "Choose Screen Sharing window" : "Relay Wispr from this window")
+                            : "Insert dictation automatically"
+            ) {
+                model.toggleAutomatic()
+            }.buttonStyle(.borderedProminent).disabled(model.automaticStarting || model.isSending)
+            Text(
+                model.role == .sender
+                    ? "Choose the mini’s Screen Sharing window once. Then use your usual Wispr dictation key while that window is focused."
+                    : "Words go into the focused text field. Password fields and known terminal apps are blocked. MacRelay never presses Enter."
+            )
+            .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Open Accessibility settings") { model.openAccessibilitySettings() }
+                Spacer()
+                Button("Save test report") { model.saveTestReport() }
+            }.font(.caption)
+            Text(
+                "Allow MacRelay on both Macs, then turn automatic mode on. A temporary clipboard change may be needed on the mini; it is restored if no other app has changed it."
+            )
+            .font(.caption).foregroundStyle(.secondary)
+            Divider()
+        }
+    }
     private var senderControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.senderPaired {
@@ -77,8 +141,8 @@ struct RelayPanel: View {
                 Button(model.isSending ? "Please wait…" : "Send clipboard text  ⇧⌥⌘S") {
                     model.sendClipboard()
                 }
-                .buttonStyle(.borderedProminent).disabled(model.isSending)
-                Text("Sends the clipboard's current plain text once. It does not read Wispr history.")
+                .buttonStyle(.bordered).disabled(model.isSending || model.automaticEnabled)
+                Text("Manual fallback: sends the clipboard once. Turn automatic mode off to use it.")
                     .font(.caption).foregroundStyle(.secondary)
                 Divider()
             }

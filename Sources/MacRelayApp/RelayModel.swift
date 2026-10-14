@@ -1,6 +1,8 @@
 import AppKit
+import ApplicationServices
 import Foundation
 import MacRelayCore
+import MacRelayInsertion
 import MacRelayTransport
 import Network
 import SwiftUI
@@ -32,6 +34,10 @@ final class RelayModel: ObservableObject {
             guard role != oldValue else { return }
             if !preview { UserDefaults.standard.set(role.rawValue, forKey: "role") }
             operation = UUID()
+            sourceWindows = []
+            selectedSourceWindowID = nil
+            sourceReceiverName = nil
+            stopAutomatic()
             stopReceiver()
             sender.cancel()
             discovery.stop()
@@ -63,6 +69,17 @@ final class RelayModel: ObservableObject {
     @Published var pendingText: String?
     @Published var expiresAt: Date?
     @Published var pairedTargetLabel: String?
+    @Published var automaticEnabled = false
+    @Published var automaticFailed = false
+    @Published var sourceWindows: [ScreenSharingWindowChoice] = []
+    @Published var selectedSourceWindowID: UUID?
+    @Published var sourceReceiverName: String?
+    var selectedSourceWindow: ScreenSharingWindowChoice? {
+        sourceWindows.first { $0.id == selectedSourceWindowID }
+    }
+    @Published var automaticStarting = false
+    private let automatic = AutomaticWisprRelay()
+    private let insertion = FocusedInsertion()
     private let receiver = RelayReceiver()
     private let sender = RelaySender()
     private let discovery = ReceiverDiscovery()
@@ -83,11 +100,56 @@ final class RelayModel: ObservableObject {
         receiver.onState = { [weak self] state in
             guard let self else { return }
             self.status = state
-            if state.hasPrefix("Receiver unavailable") { self.receiverRunning = false }
+            if state.hasPrefix("Receiver unavailable") {
+                self.receiverRunning = false
+                self.stopAutomatic()
+                self.automaticFailed = true
+            }
         }
         receiver.onTransfer = { [weak self] transfer in
             guard let self, self.role == .receiver, self.receiverRunning else {
                 throw RelayError.disconnected
+            }
+            if transfer.kind == .probe {
+                return Acknowledgement(
+                    id: transfer.id, status: .paired,
+                    capabilities: self.automaticEnabled && AccessibilitySupport.isTrusted
+                        ? [Acknowledgement.automaticInsertion] : [],
+                    receiverNames: ([Host.current().localizedName, Host.current().name].compactMap { $0 }
+                        + Host.current().addresses.filter { LocalAddress.isAllowed($0) }).prefix(8).map { $0 }
+                )
+            }
+            if transfer.kind == .cancel {
+                guard let token = transfer.token else { throw RelayError.invalidMessage }
+                self.insertion.cancel(token)
+                return Acknowledgement(id: transfer.id, status: .accepted)
+            }
+            if transfer.kind == .arm || transfer.kind == .insert {
+                guard self.automaticEnabled, AccessibilitySupport.isTrusted else {
+                    return Acknowledgement(id: transfer.id, status: .rejected)
+                }
+                if transfer.kind == .arm {
+                    do {
+                        let token = try self.insertion.arm()
+                        self.status = "Field checked. Waiting briefly for the completed dictation…"
+                        return Acknowledgement(id: transfer.id, status: .armed, token: token)
+                    } catch {
+                        self.status = error.localizedDescription
+                        return Acknowledgement(id: transfer.id, status: .rejected)
+                    }
+                }
+                guard let token = transfer.token, let text = transfer.text else {
+                    throw RelayError.invalidMessage
+                }
+                let result = await self.insertion.insert(text, token: token)
+                self.status =
+                    result == .inserted
+                    ? "Dictation inserted in the focused field."
+                    : result == .unconfirmed
+                        ? "Insertion was attempted. Check the field before dictating again."
+                        : self.insertion.testDetails["insertionFailure"]
+                            ?? "Insertion stopped because the field, selection or permission changed."
+                return Acknowledgement(id: transfer.id, status: result)
             }
             let ack = try self.inbox.receive(transfer)
             if ack.status == .accepted {
@@ -103,7 +165,24 @@ final class RelayModel: ObservableObject {
             }
         }
         discovery.onStatus = { [weak self] in self?.discoveryStatus = $0 }
+        automatic.onStatus = { [weak self] in self?.status = $0 }
+        automatic.onStopped = { [weak self] in
+            self?.automaticEnabled = false
+            self?.automaticFailed = true
+        }
         guard !preview else {
+            if CommandLine.arguments.contains("--preview-source-choice") {
+                let choice = ScreenSharingWindowChoice(
+                    binding: ScreenSharingWindowBinding(
+                        pid: 0,
+                        window: AXUIElementCreateApplication(0), originalTitle: "Example remote screen"),
+                    label: "Example remote screen (current)", isFocused: true)
+                senderPaired = true
+                sourceReceiverName = "Example Mac mini"
+                sourceWindows = [choice]
+                selectedSourceWindowID = choice.id
+                role = .sender
+            }
             hotKeyStatus = "Preview mode — shortcuts and connections are off."
             DispatchQueue.main.async { [weak self] in self?.showPreviewWindow() }
             return
@@ -214,6 +293,7 @@ final class RelayModel: ObservableObject {
         }
     }
     func stopReceiver() {
+        stopAutomatic()
         receiver.stop()
         receiverRunning = false
         inbox.clear()
@@ -247,6 +327,10 @@ final class RelayModel: ObservableObject {
     }
     func pairSender() {
         guard !preview, role == .sender, !isSending else { return }
+        stopAutomatic()
+        sourceWindows = []
+        selectedSourceWindowID = nil
+        sourceReceiverName = nil
         do {
             let key = try PairingKey(code: pairingInput)
             let target = try draftTarget()
@@ -276,7 +360,7 @@ final class RelayModel: ObservableObject {
         } catch { status = error.localizedDescription }
     }
     func sendClipboard() {
-        guard !preview, role == .sender, !isSending else { return }
+        guard !preview, role == .sender, !isSending, !automaticEnabled else { return }
         guard let senderKey, let savedTarget else {
             status = "Pair with the receiver first."
             return
@@ -337,6 +421,7 @@ final class RelayModel: ObservableObject {
     }
     func shutdown() {
         operation = UUID()
+        stopAutomatic()
         sender.cancel()
         receiver.stop()
         discovery.stop()
@@ -346,6 +431,153 @@ final class RelayModel: ObservableObject {
         refreshInbox()
         pairingCode = nil
         pairingInput = ""
+    }
+    func openAccessibilitySettings() { AccessibilitySupport.openSettings() }
+    func saveTestReport() {
+        guard !preview else { return }
+        var report = role == .sender ? automatic.testDetails : insertion.testDetails
+        report["purpose"] =
+            "Automatic relay test metadata only. No dictation, field contents, clipboard, pairing keys, audio or login details."
+        report["role"] = role.rawValue
+        report["version"] = "0.2.6-experimental"
+        report["status"] = status
+        report["automaticEnabled"] = String(automaticEnabled)
+        if role == .sender {
+            let flow = NSWorkspace.shared.runningApplications.first {
+                $0.bundleIdentifier == "com.electron.wispr-flow"
+            }
+            report["wisprVersion"] =
+                flow?.bundleURL.flatMap { Bundle(url: $0) }?.infoDictionary?["CFBundleShortVersionString"]
+                as? String ?? "unknown"
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/MacRelay")
+        let folder =
+            FileManager.default.fileExists(atPath: cloud.path)
+            ? cloud : home.appendingPathComponent("Desktop")
+        let file = folder.appendingPathComponent(
+            role == .sender ? "MacRelay-test-MacBook.json" : "MacRelay-test-mini.json")
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(report).write(to: file, options: .atomic)
+            status =
+                "Test report saved in \(folder == cloud ? "iCloud Drive → MacRelay" : "Desktop"). It contains no dictated words."
+        } catch { status = "Test report could not be saved." }
+    }
+    func prepareSourceWindows() {
+        guard !preview, role == .sender, !isSending, !automaticStarting else { return }
+        guard AccessibilitySupport.isTrusted else {
+            status = AutomationError.permission.localizedDescription
+            return
+        }
+        guard let senderKey, let savedTarget else {
+            status = "Pair the two Macs first."
+            return
+        }
+        stopAutomatic()
+        sourceWindows = []
+        selectedSourceWindowID = nil
+        sourceReceiverName = nil
+        let run = UUID()
+        operation = run
+        isSending = true
+        status = "Checking the receiver before choosing a Screen Sharing window…"
+        Task {
+            defer { isSending = false }
+            do {
+                let peer = try await sender.send(Transfer(), to: savedTarget.endpoint, pairing: senderKey)
+                guard operation == run, role == .sender else { return }
+                guard peer.capabilities?.contains(Acknowledgement.automaticInsertion) == true,
+                    let name = peer.receiverNames?.first, !name.isEmpty
+                else { throw AutomationError.receiverUpgrade }
+                sourceReceiverName = name
+                let choices = ScreenSharingWindowChoice.available()
+                guard !choices.isEmpty else { throw AutomationError.screenSharingWindowUnavailable }
+                sourceWindows = choices
+                selectedSourceWindowID =
+                    choices.first(where: \.isFocused)?.id ?? (choices.count == 1 ? choices.first?.id : nil)
+                status =
+                    "Check the receiver name below. Choose the window showing that Mac, then start automatic relay."
+            } catch {
+                guard operation == run else { return }
+                status = error.localizedDescription
+                automaticFailed = true
+            }
+        }
+    }
+    func showSelectedSourceWindow() {
+        guard !preview, !automaticEnabled else { return }
+        selectedSourceWindow?.show()
+    }
+    func toggleAutomatic() {
+        guard !preview, !automaticStarting else { return }
+        if automaticEnabled {
+            stopAutomatic()
+            status = "Automatic mode is off."
+            return
+        }
+        guard AccessibilitySupport.requestPermission() else {
+            status = AutomationError.permission.localizedDescription
+            automaticFailed = true
+            return
+        }
+        automaticFailed = false
+        if role == .receiver {
+            guard receiverPaired else {
+                status = "Pair the two Macs first."
+                return
+            }
+            if !receiverRunning { startReceiver() }
+            guard receiverRunning else { return }
+            automaticEnabled = true
+            status = "Automatic insertion is on. Click into a text field, then dictate on the MacBook."
+            return
+        }
+        guard let senderKey, let savedTarget else {
+            status = "Pair the two Macs first."
+            return
+        }
+        guard let selected = selectedSourceWindow else {
+            prepareSourceWindows()
+            return
+        }
+        guard selected.binding.isAvailable else {
+            status = AutomationError.screenSharingWindowChanged.localizedDescription
+            prepareSourceWindows()
+            return
+        }
+        automaticStarting = true
+        isSending = true
+        let run = UUID()
+        operation = run
+        status = "Checking automatic mode on the mini…"
+        Task {
+            defer {
+                automaticStarting = false
+                isSending = false
+            }
+            do {
+                try await automatic.start(
+                    to: savedTarget.endpoint, pairing: senderKey, sourceWindow: selected.binding)
+                guard operation == run, role == .sender else {
+                    automatic.stop()
+                    return
+                }
+                automaticEnabled = true
+            } catch {
+                guard operation == run else { return }
+                stopAutomatic()
+                status = error.localizedDescription
+                automaticFailed = true
+            }
+        }
+    }
+    private func stopAutomatic() {
+        automatic.stop()
+        insertion.clear()
+        automaticEnabled = false
+        automaticFailed = false
     }
     private static func userMessage(_ error: Error) -> String {
         if let known = error as? RelayError { return known.localizedDescription }
