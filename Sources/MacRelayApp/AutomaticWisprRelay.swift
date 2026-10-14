@@ -75,7 +75,7 @@ final class AutomaticWisprRelay {
             MainActor.assumeIsolated { self?.poll() }
         }
         onStatus?(
-            "Automatic mode is on. Click into a field on the mini through Screen Sharing, then dictate normally."
+            "Automatic mode is on. Click into a field on the receiver through Screen Sharing, then dictate normally."
         )
     }
     func stop() {
@@ -134,7 +134,7 @@ final class AutomaticWisprRelay {
                 return
             }
             if !sourceWasReady {
-                onStatus?("Screen Sharing window checked. Dictate normally into the mini's focused field.")
+                onStatus?("Screen Sharing window checked. Dictate normally into the receiver's focused field.")
                 sourceWasReady = true
                 pauseReason = nil
             }
@@ -213,7 +213,7 @@ final class AutomaticWisprRelay {
                 self.binding = destination
                 self.poll()
                 guard self.run == run else { return }
-                self.onStatus?("Screen Sharing window checked. Checking the mini's field…")
+                self.onStatus?("Screen Sharing window checked. Checking the receiver's field…")
                 self.observations["transferStage"] = "arming-receiver"
                 let armed = try await self.sender.send(
                     Transfer(armID: UUID()), to: endpoint, pairing: pairing)
@@ -249,7 +249,7 @@ final class AutomaticWisprRelay {
                 self.insertedCount += 1
                 self.observations["transferStage"] = "confirmed"
                 self.onStatus?(
-                    "Dictation inserted on the mini. \(self.insertedCount) confirmed; \(self.blockedCount) Wispr paste attempts stopped."
+                    "Dictation inserted on the receiver. \(self.insertedCount) confirmed; \(self.blockedCount) Wispr paste attempts stopped."
                 )
             } catch {
                 if let token = reservation {
@@ -294,7 +294,7 @@ final class AutomaticWisprRelay {
             message = error.localizedDescription
         } else {
             message =
-                "Automatic delivery stopped. Check the mini before dictating again; delivery is unconfirmed."
+                "Automatic delivery stopped. Check the receiver before dictating again; delivery is unconfirmed."
         }
         observations["lastFailure"] = message
         onStatus?(message + " Automatic mode is now off.")

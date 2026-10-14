@@ -52,7 +52,7 @@ final class RelayModel: ObservableObject {
     }
     @Published var confirmReplacement = false
     @Published var revealText = false
-    @Published var status = "Ready. Choose Send on the MacBook and Receive on the Mac mini."
+    @Published var status = "Ready. Choose Send on the sender Mac and Receive on the receiver Mac."
     @Published var hotKeyStatus = ""
     @Published var discoveryStatus = ""
     @Published var devices: [DiscoveredReceiver] = []
@@ -178,12 +178,12 @@ final class RelayModel: ObservableObject {
                         window: AXUIElementCreateApplication(0), originalTitle: "Example remote screen"),
                     label: "Example remote screen (current)", isFocused: true)
                 senderPaired = true
-                sourceReceiverName = "Example Mac mini"
+                sourceReceiverName = "Example receiver"
                 sourceWindows = [choice]
                 selectedSourceWindowID = choice.id
                 role = .sender
             }
-            hotKeyStatus = "Preview mode — shortcuts and connections are off."
+            hotKeyStatus = "Preview mode. Shortcuts and connections are off."
             DispatchQueue.main.async { [weak self] in self?.showPreviewWindow() }
             return
         }
@@ -263,7 +263,7 @@ final class RelayModel: ObservableObject {
             codeTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: false) { [weak self] _ in
                 Task { @MainActor in self?.hidePairingCode() }
             }
-            status = "Enter this code on the MacBook. Keep it private."
+            status = "Enter this code on the sender. Keep it private."
             startReceiver()
         } catch { status = error.localizedDescription }
     }
@@ -386,7 +386,7 @@ final class RelayModel: ObservableObject {
                 do {
                     _ = try await sender.send(transfer, to: savedTarget.endpoint, pairing: senderKey)
                     guard operation == run, role == .sender else { return }
-                    status = "Delivered. Use Copy received text on the Mac mini, then paste."
+                    status = "Delivered. Use Copy received text on the receiver, then paste."
                 } catch {
                     guard operation == run else { return }
                     status = Self.userMessage(error)
@@ -455,6 +455,7 @@ final class RelayModel: ObservableObject {
         let folder =
             FileManager.default.fileExists(atPath: cloud.path)
             ? cloud : home.appendingPathComponent("Desktop")
+        // Preserve legacy report filenames for compatibility; they do not constrain either Mac's role.
         let file = folder.appendingPathComponent(
             role == .sender ? "MacRelay-test-MacBook.json" : "MacRelay-test-mini.json")
         do {
@@ -531,7 +532,7 @@ final class RelayModel: ObservableObject {
             if !receiverRunning { startReceiver() }
             guard receiverRunning else { return }
             automaticEnabled = true
-            status = "Automatic insertion is on. Click into a text field, then dictate on the MacBook."
+            status = "Automatic insertion is on. Click into a text field, then dictate on the sender."
             return
         }
         guard let senderKey, let savedTarget else {
@@ -551,7 +552,7 @@ final class RelayModel: ObservableObject {
         isSending = true
         let run = UUID()
         operation = run
-        status = "Checking automatic mode on the mini…"
+        status = "Checking automatic mode on the receiver…"
         Task {
             defer {
                 automaticStarting = false
