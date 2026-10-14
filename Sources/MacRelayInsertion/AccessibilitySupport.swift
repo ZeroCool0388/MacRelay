@@ -39,6 +39,27 @@ public enum AccessibilitySupport {
         }
         return NSRange(location: range.location, length: range.length)
     }
+    /// Read the complete editable text using the field's character count and range API.
+    /// Refuse changing counts, partial responses and oversized fields. Call only after protected-field checks.
+    static func fullRangeText(_ element: AXUIElement, maximumBytes: Int) -> String? {
+        guard let count = attribute(element, kAXNumberOfCharactersAttribute) as? NSNumber,
+            CFGetTypeID(count) == CFNumberGetTypeID(),
+            count.doubleValue.isFinite, count.doubleValue == Double(count.intValue),
+            count.intValue >= 0, count.intValue <= maximumBytes
+        else { return nil }
+        let length = count.intValue
+        var range = CFRange(location: 0, length: length)
+        guard let parameter = AXValueCreate(.cfRange, &range) else { return nil }
+        var raw: CFTypeRef?
+        guard
+            AXUIElementCopyParameterizedAttributeValue(
+                element, kAXStringForRangeParameterizedAttribute as CFString, parameter, &raw) == .success,
+            let text = raw as? String, text.utf16.count == length, text.utf8.count <= maximumBytes,
+            let after = attribute(element, kAXNumberOfCharactersAttribute) as? NSNumber,
+            CFGetTypeID(after) == CFNumberGetTypeID(), after.doubleValue == Double(length)
+        else { return nil }
+        return text
+    }
 }
 
 public enum AutomationError: Error, LocalizedError {

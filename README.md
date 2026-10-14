@@ -66,6 +66,8 @@ Automatic mode starts **off** each time MacRelay opens. Turning it on ignores ea
 
 A confirmed result means the field’s exposed text matches the expected insertion. Some apps do not expose enough information through Accessibility and are refused. Password fields and known terminal apps are blocked. MacRelay never presses Enter or submits a form.
 
+The receiver prefers the field’s complete editable text through Accessibility’s character-range API when available. It chooses that reader before insertion and checks an exact result using the same reader. Other fields use their exposed value. An unavailable reader or different text remains unconfirmed; the app does not trim whitespace to declare success.
+
 If a test fails, use **Save test report** on the affected Mac. It saves only check results and counters in the existing iCloud Drive `MacRelay` folder, or on the Desktop if that folder is unavailable. It contains no dictated words, field contents, clipboard contents, keys, audio or login details. Keep reports out of public issues if they include information you want private.
 
 ## Clipboard and privacy

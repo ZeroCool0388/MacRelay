@@ -12,6 +12,7 @@ public final class FocusedInsertion {
         let field: AXUIElement
         let window: AXUIElement
         let valueHash: Data
+        let fullRangeHash: Data?
         let range: NSRange
     }
     private var permit = InsertionPermit()
@@ -40,10 +41,11 @@ public final class FocusedInsertion {
         testDetails["insertionStage"] = "checking-before-paste"
         testDetails["insertionMethod"] = "checked-paste"
         do {
-            let (now, value) = try checkedValue()
+            let (now, value, fullRangeText) = try checkedValue()
             guard same(target, now) else { throw AutomationError.focusChanged }
-            let expected = try InsertionPolicy.replacingSelection(in: value, range: target.range, text: text)
-            let expectedHash = digest(expected)
+            let verification = try FieldTextVerification(
+                value: value, fullRangeText: fullRangeText, selection: target.range, inserting: text)
+            testDetails["textVerificationSource"] = verification.source
             // A writable AXSelectedText flag does not prove that the app supports insertion.
             // Choose one checked native paste up front, never an AX write followed by paste.
             // Keep remote/dictation modifier state out of the generated shortcut.
@@ -60,7 +62,7 @@ public final class FocusedInsertion {
                     down.postToPid(target.pid)
                     up.postToPid(target.pid)
                 },
-                verify: { await self.verify(target, expectedHash: expectedHash) },
+                verify: { await self.verify(target, verification: verification) },
                 report: { self.testDetails[$0] = $1 })
             testDetails["insertionStage"] = result.rawValue
             return result
@@ -71,10 +73,12 @@ public final class FocusedInsertion {
             return .rejected
         }
     }
-    private func verify(_ target: Destination, expectedHash: Data) async -> Bool {
+    private func verify(_ target: Destination, verification: FieldTextVerification) async -> Bool {
         // Read-only verification; never re-post a failed/slow paste.
-        for _ in 0..<10 {
+        let deadline = Date().addingTimeInterval(1.5)
+        for _ in 0..<30 {
             try? await Task.sleep(nanoseconds: 50_000_000)
+            if Date() > deadline { break }
             guard !Task.isCancelled, AccessibilitySupport.isTrusted else {
                 testDetails["verification"] = "cancelled-or-permission-lost"
                 return false
@@ -95,18 +99,27 @@ public final class FocusedInsertion {
                 testDetails["verification"] = "field-or-window-unavailable-or-changed"
                 return false
             }
-            if value.utf8.count <= InsertionPolicy.maximumFieldBytes + TextPolicy.maximumBytes,
-                digest(value) == expectedHash
-            {
+            guard value.utf8.count <= InsertionPolicy.maximumFieldBytes + TextPolicy.maximumBytes else {
+                testDetails["verification"] = "field-too-large"
+                return false
+            }
+            let body = AccessibilitySupport.fullRangeText(
+                target.field, maximumBytes: InsertionPolicy.maximumFieldBytes + TextPolicy.maximumBytes)
+            testDetails["verificationValueChanged"] = String(digest(value) != target.valueHash)
+            testDetails["verificationFullRangeReadable"] = String(body != nil)
+            if verification.matches(value: value, fullRangeText: body) {
                 testDetails["verification"] = "expected-value-matched"
                 return true
             }
+            testDetails.merge(
+                verification.mismatchDetails(value: value, fullRangeText: body),
+                uniquingKeysWith: { _, new in new })
         }
         testDetails["verification"] = "expected-value-not-observed"
         return false
     }
     private func current() throws -> Destination { try checkedValue().0 }
-    private func checkedValue() throws -> (Destination, String) {
+    private func checkedValue() throws -> (Destination, String, String?) {
         testDetails["accessibilityAllowed"] = String(AccessibilitySupport.isTrusted)
         guard AccessibilitySupport.isTrusted else { throw AutomationError.permission }
         guard let app = NSWorkspace.shared.frontmostApplication, !app.isTerminated else {
@@ -146,15 +159,20 @@ public final class FocusedInsertion {
             let range = AccessibilitySupport.selection(field),
             InsertionPolicy.isValidSelection(range, in: value)
         else { throw AutomationError.noField }
+        let body = AccessibilitySupport.fullRangeText(
+            field, maximumBytes: InsertionPolicy.maximumFieldBytes)
+        testDetails["fullRangeTextReadable"] = String(body != nil)
+        if let body, !InsertionPolicy.isValidSelection(range, in: body) { throw AutomationError.noField }
         return (
             Destination(
                 pid: app.processIdentifier, field: field, window: window, valueHash: digest(value),
-                range: range), value
+                fullRangeHash: body.map(digest), range: range), value, body
         )
     }
     private func same(_ lhs: Destination, _ rhs: Destination) -> Bool {
         lhs.pid == rhs.pid && CFEqual(lhs.field, rhs.field) && CFEqual(lhs.window, rhs.window)
-            && lhs.valueHash == rhs.valueHash && lhs.range == rhs.range
+            && lhs.valueHash == rhs.valueHash && lhs.fullRangeHash == rhs.fullRangeHash
+            && lhs.range == rhs.range
     }
     private func digest(_ value: String) -> Data { Data(SHA256.hash(data: Data(value.utf8))) }
 }

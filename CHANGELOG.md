@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 — editable-text confirmation
+
+- Check complete editable text through the Accessibility character-range API when the field supports it.
+- Pin that text reader before pasting; keep exact matching and reject unavailable, partial or changed results.
+- Allow up to 1.5 seconds for the app’s text representation to update, without repeating the paste.
+- Add metadata-only reader and mismatch comparisons; formatting diagnostics never count as success.
+
+The user confirmed two consecutive dictations in TextEdit with the v0.2.3 receiver. Codex’s chat field received a paste but failed the exposed-value confirmation and disabled the sender. This update adds a compatible text reader; the Codex live test is still pending. The Air’s v0.2.2 remains compatible.
+
 ## 0.2.3 — receiver insertion
 
 - Use one checked native paste instead of relying on a writable selected-text attribute.
