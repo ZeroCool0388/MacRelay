@@ -1,7 +1,7 @@
 import AppKit
 import MacRelayCore
 
-/// One paste, with the original clipboard retained until read-only verification finishes.
+/// Restore the original clipboard only before posting or after verified insertion.
 /// The callbacks never activate an app or retry an uncertain insertion.
 @MainActor
 enum CheckedPaste {
@@ -30,9 +30,13 @@ enum CheckedPaste {
             return .rejected
         }
         let owned = pasteboard.changeCount
+        var mayRestore = true
         defer {
             if pasteboard.data(forType: ownerType) == owner {
-                report("clipboardRestored", String(snapshot.restore(pasteboard, ifUnchanged: owned)))
+                report(
+                    "clipboardRestored",
+                    String(mayRestore && snapshot.restore(pasteboard, ifUnchanged: owned)))
+                if !mayRestore { report("temporaryClipboardRetained", "true") }
             } else {
                 report("clipboardRestored", "false")
                 report("newerClipboardPreserved", "true")
@@ -42,7 +46,11 @@ enum CheckedPaste {
             pasteboard.data(forType: ownerType) == owner
         else { return .rejected }
         report("insertionStage", "paste-posted")
+        // Posting only queues Cmd-V. Until verification succeeds, it may still read the clipboard.
+        mayRestore = false
         post()
-        return await verify() ? .inserted : .unconfirmed
+        let verified = await verify()
+        mayRestore = verified
+        return verified ? .inserted : .unconfirmed
     }
 }

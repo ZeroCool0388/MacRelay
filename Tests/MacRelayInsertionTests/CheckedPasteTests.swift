@@ -36,16 +36,33 @@ import Testing
         #expect(report["clipboardRestored"] == "true")
     }
 
-    @Test func uncertainInsertionIsNeverPostedAgain() async throws {
+    @Test func unconfirmedQueuedPasteKeepsPayloadAndIsNeverPostedAgain() async throws {
         let pasteboard = board()
         defer { pasteboard.releaseGlobally() }
         var posts = 0
+        var field = ""
+        var queuedPaste: (() -> Void)?
+        var report: [String: String] = [:]
         let result = try await CheckedPaste.perform(
             "Sample", pasteboard: pasteboard, destinationUnchanged: { true },
-            post: { posts += 1 }, verify: { false }, report: { _, _ in })
+            post: {
+                posts += 1
+                queuedPaste = { field = pasteboard.string(forType: .string) ?? "" }
+            },
+            verify: {
+                await Task.yield()
+                return false
+            }, report: { report[$0] = $1 })
         #expect(result == .unconfirmed)
         #expect(posts == 1)
-        #expect(pasteboard.string(forType: .string) == "Previous copy")
+        #expect(field.isEmpty)
+        #expect(pasteboard.string(forType: .string) == "Sample")
+        #expect(report["clipboardRestored"] == "false")
+        #expect(report["temporaryClipboardRetained"] == "true")
+        // The destination resumes after verification has timed out and reads the queued payload.
+        queuedPaste?()
+        #expect(field == "Sample")
+        #expect(posts == 1)
     }
 
     @Test func changedDestinationBeforeWriteLeavesClipboardAlone() async throws {
