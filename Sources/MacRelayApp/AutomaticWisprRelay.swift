@@ -27,6 +27,10 @@ final class AutomaticWisprRelay {
     private var insertedCount = 0
     private var receiverNames: [String] = []
     private var observations: [String: String] = [:]
+    private var waitingForSource = false
+    private var sourceWasReady = false
+    private var pauseReason: String?
+    private var lastVerifiedSource = Date.distantPast
     var testDetails: [String: String] {
         observations.merging(
             [
@@ -83,6 +87,10 @@ final class AutomaticWisprRelay {
         endpoint = nil
         pairing = nil
         receiverNames = []
+        waitingForSource = false
+        sourceWasReady = false
+        pauseReason = nil
+        lastVerifiedSource = .distantPast
     }
     private func poll() {
         guard let store, var cursor else { return }
@@ -95,15 +103,34 @@ final class AutomaticWisprRelay {
             lastPIDRefresh = Date()
         }
         do {
-            guard let focused = try? ScreenSharingDestination.capture(expectedNames: receiverNames) else {
+            let source = inspectSource()
+            guard let focused = source.destination else {
+                if waitingForSource { return }
                 if task != nil {
-                    fail(AutomationError.screenSharing)
+                    fail(source.failure)
                     return
                 }
-                cursor.skip(to: try store.latestRowID())
-                self.cursor = cursor
-                binding = nil
+                let preserve = SourcePausePolicy.preserveCursor(
+                    foreground: source.details["sourceForegroundBundle"] ?? "",
+                    hasVerifiedBinding: binding != nil,
+                    secondsSinceVerified: Date().timeIntervalSince(lastVerifiedSource))
+                if !preserve {
+                    cursor.skip(to: try store.latestRowID())
+                    self.cursor = cursor
+                    binding = nil
+                }
+                let reason = source.failure.localizedDescription
+                if sourceWasReady || pauseReason != reason {
+                    onStatus?("Automatic mode is paused. " + source.failure.localizedDescription)
+                    sourceWasReady = false
+                    pauseReason = reason
+                }
                 return
+            }
+            if !sourceWasReady {
+                onStatus?("Screen Sharing window checked. Dictate normally into the mini's focused field.")
+                sourceWasReady = true
+                pauseReason = nil
             }
             if let binding, !binding.isCurrent() {
                 if task != nil {
@@ -113,6 +140,7 @@ final class AutomaticWisprRelay {
                 cursor.skip(to: try store.latestRowID())
             }
             binding = focused
+            lastVerifiedSource = Date()
             let records = try store.records(after: cursor.watermark, pending: cursor.pendingIDs)
             if let latest = records.last {
                 let app = latest.app
@@ -142,18 +170,36 @@ final class AutomaticWisprRelay {
             return
         }
         let run = self.run
-        guard let destination = try? ScreenSharingDestination.capture(expectedNames: receiverNames) else {
-            fail(AutomationError.screenSharing)
-            return
-        }
-        // Refresh immediately so a recently created History row is included.
-        poll()
-        guard self.run == run else { return }
-        onStatus?("Wispr paste stopped. Checking the mini's field…")
+        waitingForSource = true
+        onStatus?("Wispr paste stopped. Checking the Screen Sharing window…")
         task = Task { [weak self] in
             guard let self else { return }
-            defer { if self.run == run { self.task = nil } }
+            defer {
+                if self.run == run {
+                    self.task = nil
+                    self.waitingForSource = false
+                }
+            }
             do {
+                // Wispr may still be returning focus when its generated V event is intercepted.
+                // Wait for a verified source; never deliver into an unchecked session.
+                let focusDeadline = Date().addingTimeInterval(1)
+                var check = self.inspectSource()
+                while check.destination == nil, Date() < focusDeadline {
+                    guard self.run == run, !Task.isCancelled, self.guardTap.isHealthy else {
+                        throw CancellationError()
+                    }
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                    check = self.inspectSource()
+                }
+                guard self.run == run, !Task.isCancelled, let destination = check.destination else {
+                    throw check.failure
+                }
+                self.waitingForSource = false
+                self.binding = destination
+                self.poll()
+                guard self.run == run else { return }
+                self.onStatus?("Screen Sharing window checked. Checking the mini's field…")
                 let armed = try await self.sender.send(
                     Transfer(armID: UUID()), to: endpoint, pairing: pairing)
                 guard let token = armed.token else { throw RelayError.acknowledgementMismatch }
@@ -183,6 +229,17 @@ final class AutomaticWisprRelay {
                 self.fail(error)
             }
         }
+    }
+    private func inspectSource() -> ScreenSharingCheck {
+        let check = ScreenSharingDestination.inspect(expectedNames: receiverNames)
+        for key in observations.keys.filter({ $0.hasPrefix("source") }) {
+            observations.removeValue(forKey: key)
+        }
+        observations.merge(check.details, uniquingKeysWith: { _, new in new })
+        if check.details["sourceForegroundBundle"] == "com.apple.ScreenSharing" {
+            for (key, value) in check.details { observations["lastScreenSharing." + key] = value }
+        }
+        return check
     }
     private func fail(_ error: Error) {
         stop()

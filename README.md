@@ -53,10 +53,10 @@ Pairing keys stay in each Mac’s Keychain without iCloud Keychain syncing. Repl
 
 Use the experimental version on **both Macs**. Existing pairing keys remain usable.
 
-1. Allow **MacRelay** in **System Settings → Privacy & Security → Accessibility** on both Macs. The app includes a button to open that page.
+1. Allow **MacRelay** in **System Settings → Privacy & Security → Accessibility** on both Macs. On newer macOS this permission is called **Device Control and Data Access**. The app includes a button to open that page.
 2. On the **mini**, click **Insert dictation automatically**.
 3. On the **MacBook**, click **Relay Wispr automatically**.
-4. Keep just one Screen Sharing window open, connected to the paired mini. Its title must match the mini’s computer name or local host name.
+4. Keep one Screen Sharing window connected to the paired mini focused. A separate connections browser is allowed. Its title must match the mini’s computer name or local host name.
 5. Click into a blank **TextEdit** document on the mini, then dictate normally using Wispr on the MacBook.
 6. Check the words appear **once**, without any relay, copy or paste action.
 

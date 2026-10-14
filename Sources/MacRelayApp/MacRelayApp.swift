@@ -7,7 +7,10 @@ struct MacRelayApp: App {
     @StateObject private var model = RelayModel()
     var body: some Scene {
         MenuBarExtra(
-            "MacRelay", systemImage: model.pendingText == nil ? "arrow.left.arrow.right" : "tray.fill"
+            "MacRelay",
+            systemImage: model.automaticFailed
+                ? "exclamationmark.triangle"
+                : model.pendingText == nil ? "arrow.left.arrow.right" : "tray.fill"
         ) {
             RelayPanel(model: model)
         }
@@ -29,7 +32,7 @@ struct RelayPanel: View {
                         Text("Your text. Between your Macs.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("v0.2 test").font(.caption).foregroundStyle(.secondary)
+                    Text("v0.2.1 test").font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("This Mac", selection: $model.role) {
                     ForEach(RelayModel.Role.allCases, id: \.self) { Text($0.rawValue).tag($0) }

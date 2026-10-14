@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 — Screen Sharing window checks
+
+- Verify the focused receiver window without requiring the optional “standard window” label.
+- Use a single verified main window when the focused-window attribute is unavailable.
+- Briefly wait for source focus to return from Wispr before arming the receiver.
+- Mark a blocked Wispr attempt pending immediately, so a later focus check cannot discard its new record first.
+- Show when automatic mode is paused and include the exact failing window check in metadata-only reports.
+
+The first v0.2 live test detected and blocked a Wispr paste but rejected the source window. The complete live dictation path is still unproven.
+
 ## 0.2.0 — experimental automatic dictation
 
 - New Wispr dictation can be relayed without a separate send/copy/paste gesture.

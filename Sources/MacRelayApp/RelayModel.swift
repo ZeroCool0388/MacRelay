@@ -66,6 +66,7 @@ final class RelayModel: ObservableObject {
     @Published var expiresAt: Date?
     @Published var pairedTargetLabel: String?
     @Published var automaticEnabled = false
+    @Published var automaticFailed = false
     @Published var automaticStarting = false
     private let automatic = AutomaticWisprRelay()
     private let insertion = FocusedInsertion()
@@ -145,7 +146,10 @@ final class RelayModel: ObservableObject {
         }
         discovery.onStatus = { [weak self] in self?.discoveryStatus = $0 }
         automatic.onStatus = { [weak self] in self?.status = $0 }
-        automatic.onStopped = { [weak self] in self?.automaticEnabled = false }
+        automatic.onStopped = { [weak self] in
+            self?.automaticEnabled = false
+            self?.automaticFailed = true
+        }
         guard !preview else {
             hotKeyStatus = "Preview mode — shortcuts and connections are off."
             DispatchQueue.main.async { [weak self] in self?.showPreviewWindow() }
@@ -400,7 +404,7 @@ final class RelayModel: ObservableObject {
         report["purpose"] =
             "Automatic relay test metadata only. No dictation, field contents, clipboard, pairing keys, audio or login details."
         report["role"] = role.rawValue
-        report["version"] = "0.2.0-experimental"
+        report["version"] = "0.2.1-experimental"
         report["status"] = status
         report["automaticEnabled"] = String(automaticEnabled)
         if role == .sender {
@@ -435,8 +439,10 @@ final class RelayModel: ObservableObject {
         }
         guard AccessibilitySupport.isTrusted else {
             status = AutomationError.permission.localizedDescription
+            automaticFailed = true
             return
         }
+        automaticFailed = false
         if role == .receiver {
             guard receiverPaired else {
                 status = "Pair the two Macs first."
@@ -473,6 +479,7 @@ final class RelayModel: ObservableObject {
                 guard operation == run else { return }
                 stopAutomatic()
                 status = error.localizedDescription
+                automaticFailed = true
             }
         }
     }
@@ -480,6 +487,7 @@ final class RelayModel: ObservableObject {
         automatic.stop()
         insertion.clear()
         automaticEnabled = false
+        automaticFailed = false
     }
     private static func userMessage(_ error: Error) -> String {
         if let known = error as? RelayError { return known.localizedDescription }

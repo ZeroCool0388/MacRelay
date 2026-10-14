@@ -100,7 +100,9 @@ final class WisprPasteGuard {
                     return nil
                 }
                 let evidence = Data(SHA256.hash(data: Data(text.utf8)))
-                Task { @MainActor [weak self] in self?.onPaste?(evidence) }
+                // Keep this handler lightweight. It marks the attempt pending immediately,
+                // before a later run-loop turn can discard the just-finished record.
+                onPaste?(evidence)
             }
         }
         return nil
@@ -108,33 +110,118 @@ final class WisprPasteGuard {
 }
 
 @MainActor
+struct ScreenSharingCheck {
+    let destination: ScreenSharingDestination?
+    let details: [String: String]
+    let failure: AutomationError
+}
+
+@MainActor
 struct ScreenSharingDestination {
     let pid: pid_t
     let window: AXUIElement
     let expectedNames: [String]
-    static func capture(expectedNames: [String]) throws -> Self {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-            app.bundleIdentifier == "com.apple.ScreenSharing"
-        else {
-            throw AutomationError.screenSharing
+
+    static func inspect(expectedNames: [String]) -> ScreenSharingCheck {
+        var details: [String: String] = [:]
+        func failed(_ error: AutomationError) -> ScreenSharingCheck {
+            ScreenSharingCheck(destination: nil, details: details, failure: error)
+        }
+        let app = NSWorkspace.shared.frontmostApplication
+        let bundle = app?.bundleIdentifier ?? "unavailable"
+        details["sourceForegroundBundle"] =
+            bundle.count <= 128
+                && bundle.unicodeScalars.allSatisfy({
+                    CharacterSet(
+                        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_"
+                    ).contains($0)
+                })
+            ? bundle : "unrecognized"
+        guard let app, app.bundleIdentifier == "com.apple.ScreenSharing" else {
+            details["sourceCheck"] = "screen-sharing-not-foreground"
+            return failed(.screenSharing)
         }
         let root = AXUIElementCreateApplication(app.processIdentifier)
-        guard let window = AccessibilitySupport.element(root, kAXFocusedWindowAttribute),
-            let windows = AccessibilitySupport.attribute(root, kAXWindowsAttribute) as? [AXUIElement],
-            windows.filter({
+        AXUIElementSetMessagingTimeout(root, 0.1)
+        let focused = AccessibilitySupport.element(root, kAXFocusedWindowAttribute)
+        let main = AccessibilitySupport.element(root, kAXMainWindowAttribute)
+        let listedWindows = AccessibilitySupport.attribute(root, kAXWindowsAttribute) as? [AXUIElement]
+        let windows = listedWindows ?? []
+        details["sourceWindowListReadable"] = String(listedWindows != nil)
+        details["sourceFocusedWindowReadable"] = String(focused != nil)
+        details["sourceMainWindowReadable"] = String(main != nil)
+        details["sourceWindowCount"] = String(windows.count)
+        details["sourceStandardWindowCount"] = String(
+            windows.filter {
                 AccessibilitySupport.attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole
-            }).count == 1,
-            AccessibilitySupport.attribute(window, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole
-        else {
-            throw AutomationError.screenSharing
+            }.count)
+        guard let window = focused ?? main else {
+            details["sourceCheck"] = "window-not-exposed"
+            return failed(.screenSharingWindowUnavailable)
         }
-        guard let title = AccessibilitySupport.attribute(window, kAXTitleAttribute) as? String,
-            expectedNames.contains(where: { PasteGuardPolicy.remoteTitle(title, matches: $0) })
-        else { throw AutomationError.screenSharing }
-        return Self(pid: app.processIdentifier, window: window, expectedNames: expectedNames)
+        let role = AccessibilitySupport.attribute(window, kAXRoleAttribute) as? String
+        let subrole = AccessibilitySupport.attribute(window, kAXSubroleAttribute) as? String
+        func safeRole(_ role: String?) -> String {
+            guard let role, role.hasPrefix("AX"), role.count <= 64,
+                role.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+            else { return "unavailable" }
+            return role
+        }
+        details["sourceWindowRole"] = safeRole(role)
+        details["sourceWindowSubrole"] = safeRole(subrole)
+        let title = AccessibilitySupport.attribute(window, kAXTitleAttribute) as? String
+        let titleMatches =
+            title.map { title in expectedNames.contains { PasteGuardPolicy.remoteTitle(title, matches: $0) } }
+            ?? false
+        details["sourceWindowTitleReadable"] = String(title != nil)
+        details["sourceWindowNameMatched"] = String(titleMatches)
+        // Record counts/booleans only. Never include window titles or receiver names in diagnostics.
+        var matchingWindows = windows.filter { candidate in
+            guard AccessibilitySupport.attribute(candidate, kAXRoleAttribute) as? String == kAXWindowRole,
+                let title = AccessibilitySupport.attribute(candidate, kAXTitleAttribute) as? String
+            else { return false }
+            return expectedNames.contains { PasteGuardPolicy.remoteTitle(title, matches: $0) }
+        }
+        // A focused named window is independently verifiable even if the optional window list
+        // is unavailable. Never infer a main-window fallback from an unavailable list.
+        if focused != nil, windows.isEmpty, role == kAXWindowRole, titleMatches {
+            matchingWindows = [window]
+            details["sourceUsedFocusedWindowWithoutList"] = "true"
+        }
+        details["sourceMatchingWindowCount"] = String(matchingWindows.count)
+        let minimized = AccessibilitySupport.attribute(window, kAXMinimizedAttribute) as? Bool == true
+        let mainFlag = AccessibilitySupport.attribute(window, kAXMainAttribute) as? Bool == true
+        let candidateMatches = matchingWindows.contains { CFEqual($0, window) }
+        let modal = windows.contains {
+            AccessibilitySupport.attribute($0, kAXModalAttribute) as? Bool == true
+        }
+        details["sourceModalWindowPresent"] = String(modal)
+        details["sourceCandidateMatchesWindowList"] = String(candidateMatches)
+        details["sourceMainWindowFlag"] = String(mainFlag)
+        details["sourceMinimized"] = String(minimized)
+        guard titleMatches else {
+            details["sourceCheck"] = "receiver-name-not-matched"
+            return failed(.screenSharingNameMismatch)
+        }
+        guard
+            SourceWindowPolicy.canUse(
+                role: role, titleMatches: titleMatches,
+                matchingWindows: matchingWindows.count,
+                candidateIsMatchingWindow: candidateMatches,
+                hasFocusedWindow: focused != nil,
+                mainWindowIsMain: mainFlag,
+                windowCount: windows.count, minimized: minimized, modal: modal)
+        else {
+            details["sourceCheck"] = "window-focus-or-identity-not-verified"
+            return failed(.screenSharingWindowUnavailable)
+        }
+        details["sourceCheck"] = focused == nil ? "matched-main-window" : "matched-focused-window"
+        return ScreenSharingCheck(
+            destination: Self(pid: app.processIdentifier, window: window, expectedNames: expectedNames),
+            details: details, failure: .screenSharing)
     }
     func isCurrent() -> Bool {
-        guard let now = try? Self.capture(expectedNames: expectedNames) else { return false }
+        guard let now = Self.inspect(expectedNames: expectedNames).destination else { return false }
         return pid == now.pid && CFEqual(window, now.window)
     }
 }

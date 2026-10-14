@@ -85,3 +85,9 @@ Use **v0.2 test** on both Macs. Allow Accessibility, enable receiver automatic i
 - [ ] Test password fields and known terminal apps; insertion is refused.
 
 Use **Save test report** on each Mac after a failure. The report contains metadata only. Do not mark the automatic feature proven until the first two live checks pass.
+
+## First automatic live attempt — 14 October 2026
+
+The MacBook report confirmed one recognized Wispr paste was stopped, with receiver and schema checks passing. The source Screen Sharing window check rejected delivery before receiver field reservation. The user reported one visible remote window with a name matching the paired mini. No automatic insertion was confirmed.
+
+v0.2.1 removes the optional standard-window subrole requirement, checks the named focused window, and limits main-window fallback to a single verified non-modal window. It waits briefly for source focus to return and records the actual failing attributes as counts/booleans, without window titles or field text. A new live test is required; these changes are not a claim that the reported failure is fully resolved.
