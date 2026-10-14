@@ -141,4 +141,13 @@ The v0.2.6 build and tests also passed on GitHub’s macOS 14, 15 and 26 runners
 
 MacRelay has one app target containing both Send and Receive. Mixed installed versions were temporary during incremental testing, to limit repeated permission changes. The normal installation uses the same package and version on both Macs.
 
-The shared v0.2.6 archive contains the app byte for byte from the successful Air test download, with an installation guide and licence. Archive contents, version, checksum and the extracted code signature were checked locally. This packaging change does not alter the executable. GitHub continues to build and test all three supported macOS runners, but provides one development download from the macOS 14 runner, verified to use Swift 6 and Apple Silicon. The mini still requires the same v0.2.6 installation and a new matching-version live check; the earlier successful mixed-version test remains recorded separately.
+The shared v0.2.6 archive contains the app byte for byte from the successful Air test download, with an installation guide and licence. Archive contents, version, checksum and the extracted code signature were checked locally. This packaging change does not alter the executable. GitHub continues to build and test all three supported macOS runners, but provides one development download from the macOS 14 runner, verified to use Swift 6 and Apple Silicon. The mini was subsequently updated to the same v0.2.6 build; the matching-version live result is recorded below. The earlier mixed-version test remains recorded separately.
+
+
+## v0.2.6 on both Macs — user verified
+
+On 14 October 2026, the mini was updated to the shared v0.2.6 app in `/Applications/MacRelay.app` after the user quit its previous copy. Its executable, version metadata and signature resources were checked against the same app supplied to the Air, and its running process was verified.
+
+The user then confirmed that two consecutive dictations appeared in the Codex chat field and were confirmed by MacRelay, with both Macs on v0.2.6. This passes the matching-version two-Mac test: one app, Send on the Air and Receive on the mini. No separate receiver build is required. Longer sessions, interference/reconnection checks and other destination apps remain outside this bounded result.
+
+The shared-package workflow passed builds and tests on macOS 14, 15 and 26 and produced one `MacRelay-development` download: https://github.com/ZeroCool0388/MacRelay/actions/runs/38635244887.

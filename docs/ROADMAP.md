@@ -18,7 +18,7 @@ Implemented for testing:
 - Checked native paste, with guarded clipboard restoration and read-only result verification.
 - Metadata-only test reports, no saved text history and no uncertain-delivery retries.
 
-The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147. The user has verified two consecutive confirmed dictations through Screen Sharing into TextEdit, and subsequently into Codex with Air v0.2.6 and mini v0.2.5. These are bounded live tests; see [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
+The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147. The user has verified two consecutive confirmed dictations through Screen Sharing into TextEdit, and subsequently into Codex with the same v0.2.6 app on both Macs. These are bounded live tests; see [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
 
 ## Next gates
 
