@@ -27,7 +27,7 @@ MACRELAY_TEST_BONJOUR=1 ./scripts/test.sh
 
 The normal suite skips Bonjour because CI and some networks restrict discovery. The test suite never reads or writes the general clipboard, saves a pairing key, or needs real transcriptions.
 
-GitHub Actions runs the normal checks and builds the app on macOS 15 and 26. Current run results are recorded on the repository's Actions tab; this document is a local validation record, not a claim about future runs.
+GitHub Actions runs the normal checks and builds the app on macOS 14, 15, and 26. The macOS 14 job explicitly selects Xcode 16.2 to use Swift 6 instead of the runner's older default tools. Current run results are recorded on the repository's Actions tab; this document is a local validation record, not a claim about future runs.
 
 ## Still needs two Macs
 

@@ -10,11 +10,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-26]
+        os: [macos-14, macos-15, macos-26]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Select Swift 6 on macOS 14
+        if: matrix.os == 'macos-14'
+        run: |
+          test -d /Applications/Xcode_16.2.app/Contents/Developer
+          echo "DEVELOPER_DIR=/Applications/Xcode_16.2.app/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check Swift tools
         run: swift --version
       - name: Test
