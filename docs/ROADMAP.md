@@ -15,7 +15,7 @@ Implemented for testing:
 - One Screen Sharing session, checked against the paired receiver’s name.
 - Authenticated, short-lived, one-use field reservations.
 - Focus, value and selection checks before insertion; result verification afterward.
-- Direct Accessibility insertion, with guarded clipboard restoration when paste is needed.
+- Checked native paste, with guarded clipboard restoration and read-only result verification.
 - Metadata-only test reports, no saved text history and no uncertain-delivery retries.
 
 The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147; actual dictation and event filtering still need the two-Mac check in [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.

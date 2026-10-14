@@ -25,9 +25,11 @@ public final class FocusedInsertion {
     }
     public func arm() throws -> UUID {
         guard !busy else { throw RelayError.busy }
+        testDetails = ["insertionStage": "checking-field"]
         let target = try current()
         let token = try permit.arm()
         destination = target
+        testDetails["insertionStage"] = "field-armed"
         return token
     }
     public func insert(_ text: String, token: UUID) async -> Acknowledgement.Status {
@@ -35,61 +37,53 @@ public final class FocusedInsertion {
         destination = nil
         busy = true
         defer { busy = false }
+        testDetails["insertionStage"] = "checking-before-paste"
+        testDetails["insertionMethod"] = "checked-paste"
         do {
             let (now, value) = try checkedValue()
             guard same(target, now) else { throw AutomationError.focusChanged }
             let expected = try InsertionPolicy.replacingSelection(in: value, range: target.range, text: text)
             let expectedHash = digest(expected)
-            if AccessibilitySupport.isSettable(target.field, kAXSelectedTextAttribute) {
-                // A failed or unverified AX write is never followed by a second insertion method.
-                let result = AXUIElementSetAttributeValue(
-                    target.field, kAXSelectedTextAttribute as CFString, text as CFString)
-                guard result == .success else { return .unconfirmed }
-                return await verify(target, expectedHash: expectedHash) ? .inserted : .unconfirmed
-            }
-            let pasteboard = NSPasteboard.general
-            let snapshot = try ClipboardSnapshot(pasteboard)
-            guard same(target, try current()), snapshot.changeCount == pasteboard.changeCount else {
-                throw AutomationError.focusChanged
-            }
-            // Construct both events before changing the clipboard.
-            guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: true),
-                let up = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: false)
+            // A writable AXSelectedText flag does not prove that the app supports insertion.
+            // Choose one checked native paste up front, never an AX write followed by paste.
+            // Keep remote/dictation modifier state out of the generated shortcut.
+            guard let source = CGEventSource(stateID: .privateState),
+                let down = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
+                let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false)
             else { return .rejected }
             down.flags = .maskCommand
             up.flags = .maskCommand
-            let ownerType = NSPasteboard.PasteboardType("org.macrelay.temporary-insertion")
-            let owner = Data(UUID().uuidString.utf8)
-            let item = NSPasteboardItem()
-            guard item.setString(text, forType: .string), item.setData(owner, forType: ownerType) else {
-                return .rejected
-            }
-            pasteboard.clearContents()
-            let written = pasteboard.changeCount
-            guard pasteboard.writeObjects([item]) else {
-                _ = snapshot.restore(pasteboard, ifUnchanged: written)
-                return .rejected
-            }
-            let owned = pasteboard.changeCount
-            defer {
-                if pasteboard.data(forType: ownerType) == owner {
-                    _ = snapshot.restore(pasteboard, ifUnchanged: owned)
-                }
-            }
-            guard pasteboard.data(forType: ownerType) == owner, same(target, try current()) else {
-                return .rejected
-            }
-            down.postToPid(target.pid)
-            up.postToPid(target.pid)
-            return await verify(target, expectedHash: expectedHash) ? .inserted : .unconfirmed
-        } catch { return .rejected }
+            let result = try await CheckedPaste.perform(
+                text, pasteboard: .general,
+                destinationUnchanged: { self.same(target, try self.current()) },
+                post: {
+                    down.postToPid(target.pid)
+                    up.postToPid(target.pid)
+                },
+                verify: { await self.verify(target, expectedHash: expectedHash) },
+                report: { self.testDetails[$0] = $1 })
+            testDetails["insertionStage"] = result.rawValue
+            return result
+        } catch {
+            testDetails["insertionStage"] = "rejected-before-paste"
+            testDetails["insertionFailure"] =
+                error is AutomationError ? error.localizedDescription : "field-check-failed"
+            return .rejected
+        }
     }
     private func verify(_ target: Destination, expectedHash: Data) async -> Bool {
         // Read-only verification; never re-post a failed/slow paste.
         for _ in 0..<10 {
             try? await Task.sleep(nanoseconds: 50_000_000)
-            guard !Task.isCancelled, AccessibilitySupport.isTrusted,
-                NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
+            guard !Task.isCancelled, AccessibilitySupport.isTrusted else {
+                testDetails["verification"] = "cancelled-or-permission-lost"
+                return false
+            }
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid else {
+                testDetails["verification"] = "foreground-changed"
+                return false
+            }
+            guard
                 let appWindow = AccessibilitySupport.element(
                     AXUIElementCreateApplication(target.pid), kAXFocusedWindowAttribute),
                 CFEqual(appWindow, target.window),
@@ -97,18 +91,23 @@ public final class FocusedInsertion {
                     AXUIElementCreateApplication(target.pid), kAXFocusedUIElementAttribute),
                 CFEqual(appField, target.field),
                 let value = AccessibilitySupport.attribute(target.field, kAXValueAttribute) as? String
-            else { return false }
+            else {
+                testDetails["verification"] = "field-or-window-unavailable-or-changed"
+                return false
+            }
             if value.utf8.count <= InsertionPolicy.maximumFieldBytes + TextPolicy.maximumBytes,
                 digest(value) == expectedHash
             {
+                testDetails["verification"] = "expected-value-matched"
                 return true
             }
         }
+        testDetails["verification"] = "expected-value-not-observed"
         return false
     }
     private func current() throws -> Destination { try checkedValue().0 }
     private func checkedValue() throws -> (Destination, String) {
-        testDetails = ["accessibilityAllowed": String(AccessibilitySupport.isTrusted)]
+        testDetails["accessibilityAllowed"] = String(AccessibilitySupport.isTrusted)
         guard AccessibilitySupport.isTrusted else { throw AutomationError.permission }
         guard let app = NSWorkspace.shared.frontmostApplication, !app.isTerminated else {
             throw AutomationError.noField

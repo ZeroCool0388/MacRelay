@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3 — receiver insertion
+
+- Use one checked native paste instead of relying on a writable selected-text attribute.
+- Keep generated shortcut modifiers separate from remote input and dictation keys.
+- Preserve the clipboard until verification completes; never replace a newer copy.
+- Record the insertion stage, verification reason and clipboard restoration as metadata only.
+- Add receiver transaction checks for delayed verification, focus changes, uncertain results and newer copies.
+
+The v0.2.2 sender reached the receiver, which reported an unconfirmed direct insertion. This update changes the receiver; an Air running v0.2.2 remains compatible. Real dictation is still awaiting a successful live test.
+
 ## 0.2.2 — explicit source window
 
 - Show the authenticated receiver’s computer name during source setup.
