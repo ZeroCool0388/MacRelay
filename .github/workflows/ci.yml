@@ -27,9 +27,13 @@ jobs:
       - name: Build app
         run: ./scripts/build-app.sh
       - name: Package development build
-        run: ditto -c -k --keepParent build/MacRelay.app build/MacRelay-${{ matrix.os }}.zip
+        if: matrix.os == 'macos-14'
+        run: ./scripts/package-app.sh
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: matrix.os == 'macos-14'
         with:
-          name: MacRelay-${{ matrix.os }}-development
-          path: build/MacRelay-${{ matrix.os }}.zip
+          name: MacRelay-development
+          path: |
+            build/MacRelay-*-macOS.zip
+            build/MacRelay-*-macOS.zip.sha256
           retention-days: 14

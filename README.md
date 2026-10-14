@@ -4,7 +4,9 @@
 
 MacRelay is a small macOS menu bar app for using Wispr Flow through Apple Screen Sharing. The Macs connect directly using a private pairing key and encrypted transfers. MacRelay has no account, cloud relay, analytics or saved text history.
 
-**Automatic mode is experimental.** This branch builds the first automatic Wispr relay. The local tests and build checks do not prove a real spoken dictation works through Screen Sharing. See [validation](docs/VALIDATION.md). The original manual transfer remains available as a fallback.
+**One app on both Macs.** MacRelay includes both Send and Receive modes. Install the same version from the same download on each Mac; choose Send on the MacBook and Receive on the mini.
+
+**Automatic mode is experimental.** The user has confirmed two consecutive dictations into TextEdit and, subsequently, Codex through Screen Sharing. Longer use and other apps still need testing. See [validation](docs/VALIDATION.md). The original manual transfer remains available as a fallback.
 
 ## Automatic mode
 
@@ -29,13 +31,14 @@ cd MacRelay
 git switch codex/automatic-wispr
 ./scripts/test.sh
 ./scripts/build-app.sh
+./scripts/package-app.sh
 ```
 
 Move `build/MacRelay.app` into the main **Applications** folder (`/Applications`) and open that installed copy. Quit MacRelay before replacing it with a new build. This makes it available in the standard app picker when adding permissions.
 
 If developer tools are missing, install Apple’s Command Line Tools with `xcode-select --install`, or use Xcode. The scripts handle tool differences between supported versions.
 
-The app appears in the menu bar, without a Dock icon. Build it on each Mac, or copy the built app to a Mac with the same processor architecture. These are locally signed development builds, not notarized public downloads. Building from source is the supported route.
+The app appears in the menu bar, without a Dock icon. The package script creates one `build/MacRelay-<version>-macOS.zip` containing the app, installation guide and licence, plus a checksum file. Install that same archive on both Macs with the same processor architecture. An Apple Silicon build covers an Apple Silicon MacBook Air and an M4 Mac mini. There are no separate sender and receiver apps. See [installation](docs/INSTALL.md). These are locally signed development builds, not notarized public downloads. Building from source is the supported route.
 
 Keep the app in the same location after pairing. These development builds use a signature tied to each build, so an update can require fresh Keychain or Accessibility approval. Click **Open Accessibility settings** in MacRelay to ask macOS for access to the current app, then allow the installed Applications copy. A switch left on from an earlier build is not proof the current process is allowed. You can also open `Package.swift` in Xcode.
 
@@ -52,7 +55,7 @@ Pairing keys stay in each Mac’s Keychain without iCloud Keychain syncing. Repl
 
 ## Try automatic dictation
 
-Use the experimental version on **both Macs**. Existing pairing keys remain usable.
+Use the **same experimental version on both Macs**, installed from the same package. Existing pairing keys remain usable. Temporary mixed-version tests are recorded in the validation history; they are not the installation plan.
 
 1. Allow **MacRelay** in **System Settings → Privacy & Security → Accessibility** on both Macs. On newer macOS this permission is called **Device Control and Data Access**. The app includes a button to open that page.
 2. On the **mini**, click **Insert dictation automatically**.

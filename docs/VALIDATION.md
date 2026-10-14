@@ -135,3 +135,10 @@ Four synthetic checks cover a unique match among unrelated entries, duplicate ma
 On 14 October 2026, after updating only the MacBook Air to v0.2.6 and leaving the mini on v0.2.5, the user reported that both consecutive dictations appeared in the Codex chat field and were confirmed by MacRelay. The requested test used two different short dictations, waiting for the first confirmation before the second, without submitting the chat. This verifies that bounded two-Mac dictation test. No new report or transcript was needed to record the result. It does not establish long-running reliability or compatibility with other apps, and it does not retrospectively prove the exact cause of the previous failure.
 
 The v0.2.6 build and tests also passed on GitHub’s macOS 14, 15 and 26 runners, including Swift 6 on macOS 14: https://github.com/ZeroCool0388/MacRelay/actions/runs/38631201822. The remaining gates are rapid/repeated use, focus and clipboard interference, reconnection, Wispr restart/update and additional destination apps.
+
+
+## One package for both roles
+
+MacRelay has one app target containing both Send and Receive. Mixed installed versions were temporary during incremental testing, to limit repeated permission changes. The normal installation uses the same package and version on both Macs.
+
+The shared v0.2.6 archive contains the app byte for byte from the successful Air test download, with an installation guide and licence. Archive contents, version, checksum and the extracted code signature were checked locally. This packaging change does not alter the executable. GitHub continues to build and test all three supported macOS runners, but provides one development download from the macOS 14 runner, verified to use Swift 6 and Apple Silicon. The mini still requires the same v0.2.6 installation and a new matching-version live check; the earlier successful mixed-version test remains recorded separately.
