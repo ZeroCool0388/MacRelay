@@ -37,6 +37,23 @@ import Testing
         let consumed = permit.consume(fresh, now: now)
         #expect(consumed)
     }
+    @Test func cancellationAllowsImmediateRearmingAndOnlyClearsMatchingToken() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var permit = InsertionPermit()
+        let abandoned = try permit.arm(now: now)
+        let wrong = permit.cancel(UUID())
+        #expect(!wrong)
+        #expect(throws: RelayError.busy) { try permit.arm(now: now) }
+        let cancelled = permit.cancel(abandoned)
+        #expect(cancelled)
+        let fresh = try permit.arm(now: now)
+        let delayedCancellation = permit.cancel(abandoned)
+        #expect(!delayedCancellation)
+        let staleInsertion = permit.consume(abandoned, now: now)
+        #expect(!staleInsertion)
+        let freshInsertion = permit.consume(fresh, now: now)
+        #expect(freshInsertion)
+    }
     @Test func utf16SelectionPreservesUnicodeAndRefusesInvalidRanges() throws {
         #expect(
             try InsertionPolicy.replacingSelection(
@@ -94,6 +111,11 @@ import Testing
         }
         let insertion = try Transfer(inserting: "spoken words", token: token)
         #expect(try keys.openTransfer(sender.keys.sealTransfer(insertion)) == insertion)
+        let cancellation = Transfer(cancelling: token)
+        #expect(try keys.openTransfer(sender.keys.sealTransfer(cancellation)) == cancellation)
+        try sender.keys.openAcknowledgement(
+            keys.sealAcknowledgement(Acknowledgement(id: cancellation.id, status: .accepted))
+        ).validate(for: cancellation)
         try Acknowledgement(id: insertion.id, status: .inserted).validate(for: insertion)
         #expect(throws: RelayError.insertionUnconfirmed) {
             try Acknowledgement(id: insertion.id, status: .unconfirmed).validate(for: insertion)
@@ -103,6 +125,7 @@ import Testing
         }
         var inbox = Inbox()
         #expect(throws: RelayError.invalidMessage) { try inbox.receive(insertion) }
+        #expect(throws: RelayError.invalidMessage) { try inbox.receive(cancellation) }
         #expect(inbox.text == nil)
         // A v0.1 acknowledgement still decodes; it advertises no automatic capability.
         let oldJSON = "{\"id\":\"\(UUID())\",\"status\":\"paired\"}"

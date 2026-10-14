@@ -25,6 +25,9 @@ public final class FocusedInsertion {
         permit.clear()
         destination = nil
     }
+    public func cancel(_ token: UUID) {
+        if permit.cancel(token) { destination = nil }
+    }
     public func arm() throws -> UUID {
         guard !busy else { throw RelayError.busy }
         testDetails = ["insertionStage": "checking-field"]

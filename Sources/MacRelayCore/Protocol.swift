@@ -148,7 +148,7 @@ private func derive(
 }
 
 public struct Transfer: Codable, Equatable {
-    public enum Kind: String, Codable { case text, probe, arm, insert }
+    public enum Kind: String, Codable { case text, probe, arm, insert, cancel }
     public let id: UUID
     public let kind: Kind
     public let text: String?
@@ -179,6 +179,12 @@ public struct Transfer: Codable, Equatable {
         self.text = text
         self.token = token
     }
+    public init(cancelling token: UUID) {
+        id = UUID()
+        kind = .cancel
+        text = nil
+        self.token = token
+    }
     public func validate() throws {
         switch kind {
         case .text:
@@ -189,6 +195,8 @@ public struct Transfer: Codable, Equatable {
         case .insert:
             guard let text, token != nil else { throw RelayError.invalidMessage }
             try TextPolicy.validate(text)
+        case .cancel:
+            guard text == nil, token != nil else { throw RelayError.invalidMessage }
         }
     }
 }
@@ -215,7 +223,7 @@ public struct Acknowledgement: Codable, Equatable {
     public func validate(for transfer: Transfer) throws {
         guard id == transfer.id else { throw RelayError.acknowledgementMismatch }
         switch (transfer.kind, status) {
-        case (.probe, .paired), (.text, .accepted), (.insert, .inserted):
+        case (.probe, .paired), (.text, .accepted), (.insert, .inserted), (.cancel, .accepted):
             guard token == nil else { throw RelayError.acknowledgementMismatch }
             return
         case (.arm, .armed):

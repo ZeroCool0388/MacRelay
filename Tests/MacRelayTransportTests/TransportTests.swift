@@ -70,6 +70,9 @@ struct TransportTests {
                     capabilities: [Acknowledgement.automaticInsertion], receiverNames: ["Test Mac"])
             case .arm:
                 return Acknowledgement(id: transfer.id, status: .armed, token: try permit.arm())
+            case .cancel:
+                permit.cancel(try #require(transfer.token))
+                return Acknowledgement(id: transfer.id, status: .accepted)
             case .insert:
                 guard let token = transfer.token, permit.consume(token) else {
                     return Acknowledgement(id: transfer.id, status: .rejected)
@@ -85,8 +88,19 @@ struct TransportTests {
         let probe = try await sender.send(Transfer(), to: endpoint, pairing: key)
         #expect(probe.capabilities == [Acknowledgement.automaticInsertion])
         #expect(probe.receiverNames == ["Test Mac"])
+        let abandoned = try await sender.send(Transfer(armID: UUID()), to: endpoint, pairing: key)
+        let staleToken = try #require(abandoned.token)
+        let cancel = Transfer(cancelling: staleToken)
+        #expect(try await sender.send(cancel, to: endpoint, pairing: key).status == .accepted)
+        // A matching abort must allow another arm immediately, without waiting 15 seconds.
         let arm = try await sender.send(Transfer(armID: UUID()), to: endpoint, pairing: key)
         let token = try #require(arm.token)
+        // Delayed cleanup from the old attempt must not cancel the new reservation.
+        _ = try await sender.send(cancel, to: endpoint, pairing: key)
+        await #expect(throws: RelayError.insertionRejected) {
+            _ = try await sender.send(
+                Transfer(inserting: "abandoned dictation", token: staleToken), to: endpoint, pairing: key)
+        }
         let insert = try Transfer(inserting: "new dictation", token: token)
         #expect(try await sender.send(insert, to: endpoint, pairing: key).status == .inserted)
         await #expect(throws: RelayError.insertionRejected) {

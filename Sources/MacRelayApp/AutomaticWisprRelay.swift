@@ -187,6 +187,7 @@ final class AutomaticWisprRelay {
         onStatus?("Wispr paste stopped. Checking the Screen Sharing window…")
         task = Task { [weak self] in
             guard let self else { return }
+            var reservation: UUID?
             defer {
                 if self.run == run {
                     self.task = nil
@@ -217,6 +218,7 @@ final class AutomaticWisprRelay {
                 let armed = try await self.sender.send(
                     Transfer(armID: UUID()), to: endpoint, pairing: pairing)
                 guard let token = armed.token else { throw RelayError.acknowledgementMismatch }
+                reservation = token
                 self.observations["transferStage"] = "matching-dictation"
                 let deadline = Date().addingTimeInterval(5)
                 var record: WisprRecord?
@@ -250,6 +252,12 @@ final class AutomaticWisprRelay {
                     "Dictation inserted on the mini. \(self.insertedCount) confirmed; \(self.blockedCount) Wispr paste attempts stopped."
                 )
             } catch {
+                if let token = reservation {
+                    // stop() may have cancelled this task and changed the run already.
+                    // Use a separate sender so cleanup survives stopping or a quick retry.
+                    _ = try? await RelaySender().send(
+                        Transfer(cancelling: token), to: endpoint, pairing: pairing)
+                }
                 guard self.run == run else { return }
                 self.fail(error)
             }

@@ -119,6 +119,11 @@ final class RelayModel: ObservableObject {
                         + Host.current().addresses.filter { LocalAddress.isAllowed($0) }).prefix(8).map { $0 }
                 )
             }
+            if transfer.kind == .cancel {
+                guard let token = transfer.token else { throw RelayError.invalidMessage }
+                self.insertion.cancel(token)
+                return Acknowledgement(id: transfer.id, status: .accepted)
+            }
             if transfer.kind == .arm || transfer.kind == .insert {
                 guard self.automaticEnabled, AccessibilitySupport.isTrusted else {
                     return Acknowledgement(id: transfer.id, status: .rejected)

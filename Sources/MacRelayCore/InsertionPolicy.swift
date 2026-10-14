@@ -17,6 +17,12 @@ public struct InsertionPermit {
         return now < current.expiry
     }
     public mutating func clear() { pending = nil }
+    @discardableResult
+    public mutating func cancel(_ token: UUID) -> Bool {
+        guard pending?.token == token else { return false }
+        clear()
+        return true
+    }
 }
 
 public enum InsertionPolicy {
