@@ -18,11 +18,11 @@ Implemented for testing:
 - Checked native paste, with guarded clipboard restoration and read-only result verification.
 - Metadata-only test reports, no saved text history and no uncertain-delivery retries.
 
-The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147; actual dictation and event filtering still need the two-Mac check in [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
+The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147. The user has verified two consecutive confirmed dictations through Screen Sharing into TextEdit, and subsequently into Codex with Air v0.2.6 and mini v0.2.5. These are bounded live tests; see [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
 
 ## Next gates
 
-1. Prove the actual microphone → Wispr → Screen Sharing → mini field path, with native paste blocked and clipboard sync off.
+1. Extend the successful two-dictation checks into longer everyday sessions. Independently check clipboard-sync interference and the paste blocker during those sessions.
 2. Test rapid dictations, changed focus/selection, ordinary user paste, Unicode, disconnection and Wispr restart/update.
 3. Test supported everyday apps individually. Keep unsupported fields blocked rather than inserting blindly.
 4. Investigate an official completion signal/API with Wispr. Replace the local adapter if a reliable supported interface becomes available.
