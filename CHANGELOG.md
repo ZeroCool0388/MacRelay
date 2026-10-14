@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.5 — Codex chat formatting
+
+- Permit surrounding-whitespace formatting only for Codex’s complete editable-text reader.
+- Keep words, punctuation, Unicode and internal spacing exact; refuse unchanged or whitespace-only results.
+- Report exact versus chat-formatting confirmation without saving text.
+- Request the current app’s macOS permission when the user clicks setup/automatic-mode buttons.
+- Document installation in the main Applications folder and permission renewal for development updates.
+
+The v0.2.4 report found matching text after surrounding-whitespace comparison. The sender still stopped because verification required an exact field representation. This update targets that difference; repeated Codex dictation still needs a live test. TextEdit’s exact verification and the Air’s protocol remain unchanged.
+
 ## 0.2.4 — editable-text confirmation
 
 - Check complete editable text through the Accessibility character-range API when the field supports it.

@@ -429,7 +429,7 @@ final class RelayModel: ObservableObject {
         report["purpose"] =
             "Automatic relay test metadata only. No dictation, field contents, clipboard, pairing keys, audio or login details."
         report["role"] = role.rawValue
-        report["version"] = "0.2.4-experimental"
+        report["version"] = "0.2.5-experimental"
         report["status"] = status
         report["automaticEnabled"] = String(automaticEnabled)
         if role == .sender {
@@ -507,7 +507,7 @@ final class RelayModel: ObservableObject {
             status = "Automatic mode is off."
             return
         }
-        guard AccessibilitySupport.isTrusted else {
+        guard AccessibilitySupport.requestPermission() else {
             status = AutomationError.permission.localizedDescription
             automaticFailed = true
             return

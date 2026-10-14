@@ -42,7 +42,7 @@ Kinds:
 Experimental optional kinds:
 
 - `arm`: no text or token. With automatic insertion enabled, reserve the checked focused field and return `armed` with a fresh UUID token. Otherwise return `rejected`.
-- `insert`: non-empty validated text plus the reservation token. Consume a matching unexpired token **before** attempting insertion; check the destination again. Return `inserted` only after field-value verification, `rejected` when refused before an attempt, or `unconfirmed` after an unverified attempt.
+- `insert`: non-empty validated text plus the reservation token. Consume a matching unexpired token **before** attempting insertion; check the destination again. Return `inserted` only after destination-text verification, `rejected` when refused before an attempt, or `unconfirmed` after an unverified attempt. Verification is exact by default. Codex’s full editable-text reader may accept boundary-whitespace formatting for changed, non-empty content; words, punctuation, Unicode and internal spacing remain exact.
 
 New receivers advertise `wispr-insertion-v1` in a `paired` acknowledgement only when automatic insertion is enabled and Accessibility is available. Optional receiver names let the sender display the authenticated receiver when the user chooses a source Screen Sharing window. These values are encrypted. Existing v0.1 probes/clipboard messages remain compatible; old receivers do not advertise the capability, so new senders refuse automatic mode. Unknown kinds are rejected.
 
@@ -50,7 +50,7 @@ Reservations last 15 seconds. One reservation and one insertion may be live. Tok
 
 A connection reads only one encrypted transfer. It closes after acknowledgement or error. The receiver must never accept an encrypted transfer twice on the same connection. Cross-session ciphertext and client-proof replay fail because the challenge, ephemeral key pairs, and derived keys change.
 
-The inbox expires after 120 seconds and clears on explicit copy/discard, receiver stop, role switch, or app exit. There is no automatic resend. For manual `text`, successful acknowledgement proves receipt into memory. For `insert`, `inserted` means the exposed field value matched the expected single insertion; it does not mean a form was submitted.
+The inbox expires after 120 seconds and clears on explicit copy/discard, receiver stop, role switch, or app exit. There is no automatic resend. For manual `text`, successful acknowledgement proves receipt into memory. For `insert`, `inserted` means the pinned destination-text reader matched the expected single insertion under the receiver’s documented editor rule; it does not mean a form was submitted or boundary whitespace was preserved by a rich editor.
 
 ## Code map
 

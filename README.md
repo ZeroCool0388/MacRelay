@@ -29,14 +29,15 @@ cd MacRelay
 git switch codex/automatic-wispr
 ./scripts/test.sh
 ./scripts/build-app.sh
-open build/MacRelay.app
 ```
+
+Move `build/MacRelay.app` into the main **Applications** folder (`/Applications`) and open that installed copy. Quit MacRelay before replacing it with a new build. This makes it available in the standard app picker when adding permissions.
 
 If developer tools are missing, install Apple’s Command Line Tools with `xcode-select --install`, or use Xcode. The scripts handle tool differences between supported versions.
 
 The app appears in the menu bar, without a Dock icon. Build it on each Mac, or copy the built app to a Mac with the same processor architecture. These are locally signed development builds, not notarized public downloads. Building from source is the supported route.
 
-Keep the app in the same location after pairing. Rebuilding a development app can trigger Keychain or Accessibility permission prompts. You can also open `Package.swift` in Xcode.
+Keep the app in the same location after pairing. These development builds use a signature tied to each build, so an update can require fresh Keychain or Accessibility approval. Click **Open Accessibility settings** in MacRelay to ask macOS for access to the current app, then allow the installed Applications copy. A switch left on from an earlier build is not proof the current process is allowed. You can also open `Package.swift` in Xcode.
 
 ## Pair the Macs
 
@@ -66,7 +67,7 @@ Automatic mode starts **off** each time MacRelay opens. Turning it on ignores ea
 
 A confirmed result means the field’s exposed text matches the expected insertion. Some apps do not expose enough information through Accessibility and are refused. Password fields and known terminal apps are blocked. MacRelay never presses Enter or submits a form.
 
-The receiver prefers the field’s complete editable text through Accessibility’s character-range API when available. It chooses that reader before insertion and checks an exact result using the same reader. Other fields use their exposed value. An unavailable reader or different text remains unconfirmed; the app does not trim whitespace to declare success.
+The receiver prefers the field’s complete editable text through Accessibility’s character-range API when available. It chooses that reader before insertion and checks the result using the same reader. Other fields use their exposed value. Codex’s chat editor has a narrow compatibility rule: differences only in surrounding whitespace may confirm a changed, non-empty complete text result. Words, punctuation, Unicode and internal spacing must still match. The text sent and pasted is unchanged. Other apps require an exact match. An unavailable reader remains unconfirmed.
 
 If a test fails, use **Save test report** on the affected Mac. It saves only check results and counters in the existing iCloud Drive `MacRelay` folder, or on the Desktop if that folder is unavailable. It contains no dictated words, field contents, clipboard contents, keys, audio or login details. Keep reports out of public issues if they include information you want private.
 

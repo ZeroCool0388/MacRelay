@@ -32,7 +32,7 @@ struct RelayPanel: View {
                         Text("Your text. Between your Macs.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("v0.2.4 test").font(.caption).foregroundStyle(.secondary)
+                    Text("v0.2.5 test").font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("This Mac", selection: $model.role) {
                     ForEach(RelayModel.Role.allCases, id: \.self) { Text($0.rawValue).tag($0) }

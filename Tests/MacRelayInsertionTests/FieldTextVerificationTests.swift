@@ -57,4 +57,52 @@ import Testing
             !check.matches(
                 value: "Sample", fullRangeText: String(repeating: "a", count: 321 * 1024)))
     }
+
+    @Test func codexBoundaryFormattingConfirmsWithoutChangingWordsOrInternalSpacing() throws {
+        let check = try FieldTextVerification(
+            value: "\n", fullRangeText: "\n", selection: NSRange(location: 0, length: 0),
+            inserting: "Sample words.", appBundleIdentifier: "com.openai.codex")
+        #expect(
+            check.match(value: "Sample words.", fullRangeText: "Sample words.") == .chatBoundaryWhitespace)
+        #expect(check.match(value: "unused", fullRangeText: "Sample words.\n") == .exact)
+        for wrong in [
+            "Sample", "Sample words", "Sample  words.", "Different words.", "Sample words.Sample words.",
+        ] {
+            #expect(!check.matches(value: "unused", fullRangeText: wrong))
+        }
+        #expect(!check.matches(value: "Sample words.", fullRangeText: nil))
+    }
+
+    @Test func formattingExceptionRequiresTheExactCodexAppAndFullRangeReader() throws {
+        for bundle in ["com.apple.TextEdit", "com.openai.codex.other", "unknown", ""] {
+            let check = try FieldTextVerification(
+                value: "\n", fullRangeText: "\n", selection: NSRange(location: 0, length: 0),
+                inserting: "Sample", appBundleIdentifier: bundle)
+            #expect(!check.matches(value: "Sample", fullRangeText: "Sample"))
+        }
+        let valueOnly = try FieldTextVerification(
+            value: "\n", fullRangeText: nil, selection: NSRange(location: 0, length: 0),
+            inserting: "Sample", appBundleIdentifier: "com.openai.codex")
+        #expect(!valueOnly.matches(value: "Sample", fullRangeText: "Sample"))
+    }
+
+    @Test func formattedConfirmationRefusesUnchangedContentAndWhitespaceOnlyInsertion() throws {
+        let unchanged = try FieldTextVerification(
+            value: "Sample\n", fullRangeText: "Sample\n", selection: NSRange(location: 0, length: 7),
+            inserting: "Sample", appBundleIdentifier: "com.openai.codex")
+        #expect(!unchanged.matches(value: "Sample\n", fullRangeText: "Sample\n"))
+        let whitespace = try FieldTextVerification(
+            value: "", fullRangeText: "", selection: NSRange(location: 0, length: 0),
+            inserting: " \n", appBundleIdentifier: "com.openai.codex")
+        #expect(!whitespace.matches(value: "\n ", fullRangeText: "\n "))
+    }
+
+    @Test func aSecondSentenceKeepsItsSeparatingSpaceAndUnicodeContent() throws {
+        let check = try FieldTextVerification(
+            value: "First.", fullRangeText: "First.", selection: NSRange(location: 6, length: 0),
+            inserting: " Café second.", appBundleIdentifier: "com.openai.codex")
+        #expect(check.matches(value: "unused", fullRangeText: "\nFirst. Café second.\n"))
+        #expect(!check.matches(value: "unused", fullRangeText: "First.Café second."))
+        #expect(!check.matches(value: "unused", fullRangeText: "First. Cafe\u{301} second."))
+    }
 }

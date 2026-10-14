@@ -9,6 +9,7 @@ import MacRelayCore
 public final class FocusedInsertion {
     private struct Destination {
         let pid: pid_t
+        let bundleIdentifier: String
         let field: AXUIElement
         let window: AXUIElement
         let valueHash: Data
@@ -44,7 +45,8 @@ public final class FocusedInsertion {
             let (now, value, fullRangeText) = try checkedValue()
             guard same(target, now) else { throw AutomationError.focusChanged }
             let verification = try FieldTextVerification(
-                value: value, fullRangeText: fullRangeText, selection: target.range, inserting: text)
+                value: value, fullRangeText: fullRangeText, selection: target.range, inserting: text,
+                appBundleIdentifier: target.bundleIdentifier)
             testDetails["textVerificationSource"] = verification.source
             // A writable AXSelectedText flag does not prove that the app supports insertion.
             // Choose one checked native paste up front, never an AX write followed by paste.
@@ -107,7 +109,8 @@ public final class FocusedInsertion {
                 target.field, maximumBytes: InsertionPolicy.maximumFieldBytes + TextPolicy.maximumBytes)
             testDetails["verificationValueChanged"] = String(digest(value) != target.valueHash)
             testDetails["verificationFullRangeReadable"] = String(body != nil)
-            if verification.matches(value: value, fullRangeText: body) {
+            if let match = verification.match(value: value, fullRangeText: body) {
+                testDetails["verificationMatch"] = match.rawValue
                 testDetails["verification"] = "expected-value-matched"
                 return true
             }
@@ -126,6 +129,8 @@ public final class FocusedInsertion {
             throw AutomationError.noField
         }
         let bundle = (app.bundleIdentifier ?? "").lowercased()
+        testDetails["destinationApp"] =
+            bundle == "com.openai.codex" ? "codex" : bundle == "com.apple.textedit" ? "textedit" : "other"
         let blocked = [
             "terminal", "iterm", "warp", "kitty", "wezterm", "alacritty", "ghostty", "hyper", "ssh",
         ]
@@ -165,12 +170,14 @@ public final class FocusedInsertion {
         if let body, !InsertionPolicy.isValidSelection(range, in: body) { throw AutomationError.noField }
         return (
             Destination(
-                pid: app.processIdentifier, field: field, window: window, valueHash: digest(value),
+                pid: app.processIdentifier, bundleIdentifier: app.bundleIdentifier ?? "",
+                field: field, window: window, valueHash: digest(value),
                 fullRangeHash: body.map(digest), range: range), value, body
         )
     }
     private func same(_ lhs: Destination, _ rhs: Destination) -> Bool {
-        lhs.pid == rhs.pid && CFEqual(lhs.field, rhs.field) && CFEqual(lhs.window, rhs.window)
+        lhs.pid == rhs.pid && lhs.bundleIdentifier == rhs.bundleIdentifier
+            && CFEqual(lhs.field, rhs.field) && CFEqual(lhs.window, rhs.window)
             && lhs.valueHash == rhs.valueHash && lhs.fullRangeHash == rhs.fullRangeHash
             && lhs.range == rhs.range
     }

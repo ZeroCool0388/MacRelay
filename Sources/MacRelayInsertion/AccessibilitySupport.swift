@@ -4,7 +4,14 @@ import ApplicationServices
 @MainActor
 public enum AccessibilitySupport {
     public static var isTrusted: Bool { AXIsProcessTrusted() }
+    /// Call only for an explicit setup gesture. The macOS prompt is asynchronous;
+    /// the return value still reflects current permission, not a future approval.
+    public static func requestPermission() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
     public static func openSettings() {
+        _ = requestPermission()
         guard
             let url = URL(
                 string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
