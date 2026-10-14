@@ -91,3 +91,9 @@ Use **Save test report** on each Mac after a failure. The report contains metada
 The MacBook report confirmed one recognized Wispr paste was stopped, with receiver and schema checks passing. The source Screen Sharing window check rejected delivery before receiver field reservation. The user reported one visible remote window with a name matching the paired mini. No automatic insertion was confirmed.
 
 v0.2.1 removes the optional standard-window subrole requirement, checks the named focused window, and limits main-window fallback to a single verified non-modal window. It waits briefly for source focus to return and records the actual failing attributes as counts/booleans, without window titles or field text. A new live test is required; these changes are not a claim that the reported failure is fully resolved.
+
+## v0.2.1 live attempt
+
+The report confirmed the focused window and title were readable, one Wispr paste was stopped, and no insertion was attempted. The receiver-name comparison returned false for every source window. The user-visible title matched the mini’s reported name, so the name heuristic did not establish the intended source reliably.
+
+v0.2.2 uses an explicit source-window choice beside the authenticated receiver name. It keeps the original window reference, owner process and title in memory and refuses a changed window. Alias acceptance and changed-process/window/title refusal are checked with synthetic inputs. The user must still confirm the receiver is the mini, choose the window showing it, and complete a new spoken dictation test.

@@ -55,14 +55,14 @@ Use the experimental version on **both Macs**. Existing pairing keys remain usab
 
 1. Allow **MacRelay** in **System Settings → Privacy & Security → Accessibility** on both Macs. On newer macOS this permission is called **Device Control and Data Access**. The app includes a button to open that page.
 2. On the **mini**, click **Insert dictation automatically**.
-3. On the **MacBook**, click **Relay Wispr automatically**.
-4. Keep one Screen Sharing window connected to the paired mini focused. A separate connections browser is allowed. Its title must match the mini’s computer name or local host name.
+3. On the **MacBook**, click **Choose Screen Sharing window**. Check that the receiver name is your mini, choose the window showing it, then click **Relay Wispr from this window**.
+4. Keep the chosen Screen Sharing window focused. A separate connections browser is allowed. The window choice is explicit because macOS may expose a different connection label from the visible computer name.
 5. Click into a blank **TextEdit** document on the mini, then dictate normally using Wispr on the MacBook.
 6. Check the words appear **once**, without any relay, copy or paste action.
 
 Turn off Screen Sharing’s **Share Clipboard** option during this test, so its own sync cannot affect the result. MacRelay does not change that setting for you.
 
-Automatic mode starts **off** each time MacRelay opens. Turning it on ignores earlier Wispr records, including unfinished ones already present. Changing roles, stopping receiving or quitting cancels automatic work. Changing the source window or destination field during delivery stops the attempt.
+Automatic mode starts **off** each time MacRelay opens. Turning it on ignores earlier Wispr records, including unfinished ones already present. Changing roles, stopping receiving or quitting cancels automatic work. Changing the chosen source window, its title or the destination field during delivery stops the attempt. The window choice is kept only in memory; choose again after quitting the app or opening a new remote session.
 
 A confirmed result means the field’s exposed text matches the expected insertion. Some apps do not expose enough information through Accessibility and are refused. Password fields and known terminal apps are blocked. MacRelay never presses Enter or submits a form.
 
@@ -95,7 +95,7 @@ Plain text only, up to 64 KiB per dictation or transfer. Images, files, formatti
 | --- | --- |
 | No receiver | Start receiving; check Local Network permission and Wi-Fi. Try a manual local address. |
 | Automatic mode will not start | Update both Macs, allow Accessibility, and enable automatic insertion on the mini first. |
-| Screen Sharing check fails | Use one window for the paired mini. Its title must match the receiver’s name. |
+| Screen Sharing check fails | Choose the window showing the paired mini. Use **Show window** to check your choice. Re-select after closing, changing or reconnecting the session. |
 | Field cannot be checked | Try a blank TextEdit document. Some apps do not expose editable text or selection. |
 | Wispr’s paste is unrecognized | Save the MacBook test report. Automatic transfer is refused to avoid sending the words twice. |
 | Insertion is unconfirmed | Check the field before dictating again. MacRelay does not retry. |

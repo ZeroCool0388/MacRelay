@@ -121,8 +121,11 @@ struct ScreenSharingDestination {
     let pid: pid_t
     let window: AXUIElement
     let expectedNames: [String]
+    let approvedWindow: ScreenSharingWindowBinding
 
-    static func inspect(expectedNames: [String]) -> ScreenSharingCheck {
+    static func inspect(expectedNames: [String], approvedWindow: ScreenSharingWindowBinding)
+        -> ScreenSharingCheck
+    {
         var details: [String: String] = [:]
         func failed(_ error: AutomationError) -> ScreenSharingCheck {
             ScreenSharingCheck(destination: nil, details: details, failure: error)
@@ -175,16 +178,21 @@ struct ScreenSharingDestination {
             ?? false
         details["sourceWindowTitleReadable"] = String(title != nil)
         details["sourceWindowNameMatched"] = String(titleMatches)
-        // Record counts/booleans only. Never include window titles or receiver names in diagnostics.
+        let approvedMatch = approvedWindow.matches(pid: app.processIdentifier, window: window, title: title)
+        details["sourceChosenPIDMatched"] = String(approvedWindow.pid == app.processIdentifier)
+        details["sourceChosenWindowIdentityMatched"] = String(CFEqual(approvedWindow.window, window))
+        details["sourceChosenTitleUnchanged"] = String(title == approvedWindow.originalTitle)
+        details["sourceUserChosenWindowMatched"] = String(approvedMatch)
+        // The user explicitly maps this window to the authenticated receiver. A display-name
+        // alias is allowed; the window reference, original title and owner PID must stay unchanged.
         var matchingWindows = windows.filter { candidate in
-            guard AccessibilitySupport.attribute(candidate, kAXRoleAttribute) as? String == kAXWindowRole,
-                let title = AccessibilitySupport.attribute(candidate, kAXTitleAttribute) as? String
+            guard AccessibilitySupport.attribute(candidate, kAXRoleAttribute) as? String == kAXWindowRole
             else { return false }
-            return expectedNames.contains { PasteGuardPolicy.remoteTitle(title, matches: $0) }
+            return approvedWindow.matches(
+                pid: app.processIdentifier, window: candidate,
+                title: AccessibilitySupport.attribute(candidate, kAXTitleAttribute) as? String)
         }
-        // A focused named window is independently verifiable even if the optional window list
-        // is unavailable. Never infer a main-window fallback from an unavailable list.
-        if focused != nil, windows.isEmpty, role == kAXWindowRole, titleMatches {
+        if focused != nil, windows.isEmpty, role == kAXWindowRole, approvedMatch {
             matchingWindows = [window]
             details["sourceUsedFocusedWindowWithoutList"] = "true"
         }
@@ -199,13 +207,13 @@ struct ScreenSharingDestination {
         details["sourceCandidateMatchesWindowList"] = String(candidateMatches)
         details["sourceMainWindowFlag"] = String(mainFlag)
         details["sourceMinimized"] = String(minimized)
-        guard titleMatches else {
-            details["sourceCheck"] = "receiver-name-not-matched"
-            return failed(.screenSharingNameMismatch)
+        guard approvedMatch else {
+            details["sourceCheck"] = "chosen-window-changed-or-not-focused"
+            return failed(.screenSharingWindowChanged)
         }
         guard
             SourceWindowPolicy.canUse(
-                role: role, titleMatches: titleMatches,
+                role: role, titleMatches: approvedMatch,
                 matchingWindows: matchingWindows.count,
                 candidateIsMatchingWindow: candidateMatches,
                 hasFocusedWindow: focused != nil,
@@ -217,11 +225,14 @@ struct ScreenSharingDestination {
         }
         details["sourceCheck"] = focused == nil ? "matched-main-window" : "matched-focused-window"
         return ScreenSharingCheck(
-            destination: Self(pid: app.processIdentifier, window: window, expectedNames: expectedNames),
+            destination: Self(
+                pid: app.processIdentifier, window: window, expectedNames: expectedNames,
+                approvedWindow: approvedWindow),
             details: details, failure: .screenSharing)
     }
     func isCurrent() -> Bool {
-        guard let now = Self.inspect(expectedNames: expectedNames).destination else { return false }
+        guard let now = Self.inspect(expectedNames: expectedNames, approvedWindow: approvedWindow).destination
+        else { return false }
         return pid == now.pid && CFEqual(window, now.window)
     }
 }

@@ -26,6 +26,7 @@ final class AutomaticWisprRelay {
     private var blockedCount = 0
     private var insertedCount = 0
     private var receiverNames: [String] = []
+    private var approvedWindow: ScreenSharingWindowBinding?
     private var observations: [String: String] = [:]
     private var waitingForSource = false
     private var sourceWasReady = false
@@ -39,9 +40,13 @@ final class AutomaticWisprRelay {
             ], uniquingKeysWith: { _, new in new })
     }
 
-    func start(to endpoint: NWEndpoint, pairing: PairingKey) async throws {
+    func start(to endpoint: NWEndpoint, pairing: PairingKey, sourceWindow: ScreenSharingWindowBinding)
+        async throws
+    {
         stop()
         let startingRun = run
+        guard sourceWindow.isAvailable else { throw AutomationError.screenSharingWindowChanged }
+        approvedWindow = sourceWindow
         guard AccessibilitySupport.isTrusted else { throw AutomationError.permission }
         let probe = try await sender.send(Transfer(), to: endpoint, pairing: pairing)
         guard run == startingRun, !Task.isCancelled else { throw CancellationError() }
@@ -87,6 +92,7 @@ final class AutomaticWisprRelay {
         endpoint = nil
         pairing = nil
         receiverNames = []
+        approvedWindow = nil
         waitingForSource = false
         sourceWasReady = false
         pauseReason = nil
@@ -231,7 +237,13 @@ final class AutomaticWisprRelay {
         }
     }
     private func inspectSource() -> ScreenSharingCheck {
-        let check = ScreenSharingDestination.inspect(expectedNames: receiverNames)
+        guard let approvedWindow else {
+            return ScreenSharingCheck(
+                destination: nil, details: ["sourceCheck": "no-window-chosen"],
+                failure: .screenSharingWindowChanged)
+        }
+        let check = ScreenSharingDestination.inspect(
+            expectedNames: receiverNames, approvedWindow: approvedWindow)
         for key in observations.keys.filter({ $0.hasPrefix("source") }) {
             observations.removeValue(forKey: key)
         }

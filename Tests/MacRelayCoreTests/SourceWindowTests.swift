@@ -26,6 +26,35 @@ import Testing
         #expect(!allowed(focused: false, main: true, count: 0))
         #expect(!allowed(focused: false, main: true, count: 2))
     }
+    @Test func explicitWindowChoiceAllowsAnAliasButRequiresExactLiveIdentity() {
+        let alias = "My development screen"
+        #expect(!PasteGuardPolicy.remoteTitle(alias, matches: "Example Mac mini"))
+        let bound = SourceBindingPolicy.matches(
+            approvedPID: 42, currentPID: 42, sameWindow: true,
+            approvedTitle: alias, currentTitle: alias)
+        #expect(bound)
+        #expect(allowed(titleMatches: bound, count: 2))
+        #expect(
+            !SourceBindingPolicy.matches(
+                approvedPID: 42, currentPID: 43, sameWindow: true,
+                approvedTitle: alias, currentTitle: alias))
+        #expect(
+            !SourceBindingPolicy.matches(
+                approvedPID: 42, currentPID: 42, sameWindow: false,
+                approvedTitle: alias, currentTitle: alias))
+        #expect(
+            !SourceBindingPolicy.matches(
+                approvedPID: 42, currentPID: 42, sameWindow: true,
+                approvedTitle: alias, currentTitle: "Different session"))
+        #expect(
+            !SourceBindingPolicy.matches(
+                approvedPID: 42, currentPID: 42, sameWindow: true,
+                approvedTitle: alias, currentTitle: nil))
+        #expect(
+            !SourceBindingPolicy.matches(
+                approvedPID: 42, currentPID: 42, sameWindow: true,
+                approvedTitle: "", currentTitle: ""))
+    }
     @Test func transientWisprFocusPreservesNewRecordsWithoutAuthorizingOtherApps() {
         #expect(
             SourcePausePolicy.preserveCursor(

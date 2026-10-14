@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2 — explicit source window
+
+- Show the authenticated receiver’s computer name during source setup.
+- Let the user explicitly choose and show the Screen Sharing window mapped to that receiver.
+- Track the chosen window’s process, identity and original title instead of assuming its name equals the receiver’s computer name.
+- Keep the window choice in memory only; changed/closed windows require a new choice.
+
+The v0.2.1 live report identified the machine/window name comparison as the blocker. New automated checks do not replace the remaining live dictation test.
+
 ## 0.2.1 — Screen Sharing window checks
 
 - Verify the focused receiver window without requiring the optional “standard window” label.

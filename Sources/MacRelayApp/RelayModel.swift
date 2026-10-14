@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Foundation
 import MacRelayCore
 import MacRelayInsertion
@@ -33,6 +34,9 @@ final class RelayModel: ObservableObject {
             guard role != oldValue else { return }
             if !preview { UserDefaults.standard.set(role.rawValue, forKey: "role") }
             operation = UUID()
+            sourceWindows = []
+            selectedSourceWindowID = nil
+            sourceReceiverName = nil
             stopAutomatic()
             stopReceiver()
             sender.cancel()
@@ -67,6 +71,12 @@ final class RelayModel: ObservableObject {
     @Published var pairedTargetLabel: String?
     @Published var automaticEnabled = false
     @Published var automaticFailed = false
+    @Published var sourceWindows: [ScreenSharingWindowChoice] = []
+    @Published var selectedSourceWindowID: UUID?
+    @Published var sourceReceiverName: String?
+    var selectedSourceWindow: ScreenSharingWindowChoice? {
+        sourceWindows.first { $0.id == selectedSourceWindowID }
+    }
     @Published var automaticStarting = false
     private let automatic = AutomaticWisprRelay()
     private let insertion = FocusedInsertion()
@@ -151,6 +161,18 @@ final class RelayModel: ObservableObject {
             self?.automaticFailed = true
         }
         guard !preview else {
+            if CommandLine.arguments.contains("--preview-source-choice") {
+                let choice = ScreenSharingWindowChoice(
+                    binding: ScreenSharingWindowBinding(
+                        pid: 0,
+                        window: AXUIElementCreateApplication(0), originalTitle: "Example remote screen"),
+                    label: "Example remote screen (current)", isFocused: true)
+                senderPaired = true
+                sourceReceiverName = "Example Mac mini"
+                sourceWindows = [choice]
+                selectedSourceWindowID = choice.id
+                role = .sender
+            }
             hotKeyStatus = "Preview mode — shortcuts and connections are off."
             DispatchQueue.main.async { [weak self] in self?.showPreviewWindow() }
             return
@@ -296,6 +318,9 @@ final class RelayModel: ObservableObject {
     func pairSender() {
         guard !preview, role == .sender, !isSending else { return }
         stopAutomatic()
+        sourceWindows = []
+        selectedSourceWindowID = nil
+        sourceReceiverName = nil
         do {
             let key = try PairingKey(code: pairingInput)
             let target = try draftTarget()
@@ -404,7 +429,7 @@ final class RelayModel: ObservableObject {
         report["purpose"] =
             "Automatic relay test metadata only. No dictation, field contents, clipboard, pairing keys, audio or login details."
         report["role"] = role.rawValue
-        report["version"] = "0.2.1-experimental"
+        report["version"] = "0.2.2-experimental"
         report["status"] = status
         report["automaticEnabled"] = String(automaticEnabled)
         if role == .sender {
@@ -429,6 +454,51 @@ final class RelayModel: ObservableObject {
             status =
                 "Test report saved in \(folder == cloud ? "iCloud Drive → MacRelay" : "Desktop"). It contains no dictated words."
         } catch { status = "Test report could not be saved." }
+    }
+    func prepareSourceWindows() {
+        guard !preview, role == .sender, !isSending, !automaticStarting else { return }
+        guard AccessibilitySupport.isTrusted else {
+            status = AutomationError.permission.localizedDescription
+            return
+        }
+        guard let senderKey, let savedTarget else {
+            status = "Pair the two Macs first."
+            return
+        }
+        stopAutomatic()
+        sourceWindows = []
+        selectedSourceWindowID = nil
+        sourceReceiverName = nil
+        let run = UUID()
+        operation = run
+        isSending = true
+        status = "Checking the receiver before choosing a Screen Sharing window…"
+        Task {
+            defer { isSending = false }
+            do {
+                let peer = try await sender.send(Transfer(), to: savedTarget.endpoint, pairing: senderKey)
+                guard operation == run, role == .sender else { return }
+                guard peer.capabilities?.contains(Acknowledgement.automaticInsertion) == true,
+                    let name = peer.receiverNames?.first, !name.isEmpty
+                else { throw AutomationError.receiverUpgrade }
+                sourceReceiverName = name
+                let choices = ScreenSharingWindowChoice.available()
+                guard !choices.isEmpty else { throw AutomationError.screenSharingWindowUnavailable }
+                sourceWindows = choices
+                selectedSourceWindowID =
+                    choices.first(where: \.isFocused)?.id ?? (choices.count == 1 ? choices.first?.id : nil)
+                status =
+                    "Check the receiver name below. Choose the window showing that Mac, then start automatic relay."
+            } catch {
+                guard operation == run else { return }
+                status = error.localizedDescription
+                automaticFailed = true
+            }
+        }
+    }
+    func showSelectedSourceWindow() {
+        guard !preview, !automaticEnabled else { return }
+        selectedSourceWindow?.show()
     }
     func toggleAutomatic() {
         guard !preview, !automaticStarting else { return }
@@ -458,6 +528,15 @@ final class RelayModel: ObservableObject {
             status = "Pair the two Macs first."
             return
         }
+        guard let selected = selectedSourceWindow else {
+            prepareSourceWindows()
+            return
+        }
+        guard selected.binding.isAvailable else {
+            status = AutomationError.screenSharingWindowChanged.localizedDescription
+            prepareSourceWindows()
+            return
+        }
         automaticStarting = true
         isSending = true
         let run = UUID()
@@ -469,7 +548,8 @@ final class RelayModel: ObservableObject {
                 isSending = false
             }
             do {
-                try await automatic.start(to: savedTarget.endpoint, pairing: senderKey)
+                try await automatic.start(
+                    to: savedTarget.endpoint, pairing: senderKey, sourceWindow: selected.binding)
                 guard operation == run, role == .sender else {
                     automatic.stop()
                     return

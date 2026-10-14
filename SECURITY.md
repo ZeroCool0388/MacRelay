@@ -36,7 +36,7 @@ There is no persistent deduplication ledger. The one-message-per-session rule pr
 
 ## Automatic insertion
 
-Automatic mode is explicitly enabled on both Macs and starts off after relaunch. A receiver capability check prevents a new sender from treating a v0.1 receiver as an automatic inserter. Receiver names are carried only in authenticated encrypted acknowledgements, not Bonjour advertisements.
+Automatic mode is explicitly enabled on both Macs and starts off after relaunch. A receiver capability check prevents a new sender from treating a v0.1 receiver as an automatic inserter. Receiver names are carried only in authenticated encrypted acknowledgements, not Bonjour advertisements. The user explicitly maps a Screen Sharing window to that receiver. Its owner PID, AX window reference and original title must stay the same. The selection is not persisted. Machine/connection names can be aliases, so display-name equality is not used as an authentication substitute.
 
 The sender uses an undocumented Wispr database adapter opened with SQLite READONLY. It baselines the maximum row ID when enabled, reads bounded new-record metadata and completed bodies for Screen Sharing only, and ignores earlier transcript bodies. Records that appear outside the checked Screen Sharing window are skipped. Database replacement, schema mismatch, ambiguity and missing completed text stop delivery.
 

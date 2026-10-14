@@ -30,3 +30,15 @@ public enum SourcePausePolicy {
         return foreground == "com.apple.ScreenSharing" && secondsSinceVerified < 1
     }
 }
+
+/// Explicit setup binds one window to an authenticated receiver, independent of its display alias.
+/// Window identity, process and original title must all remain the same for delivery.
+public enum SourceBindingPolicy {
+    public static func matches(
+        approvedPID: Int32, currentPID: Int32, sameWindow: Bool,
+        approvedTitle: String, currentTitle: String?
+    ) -> Bool {
+        approvedPID > 0 && approvedPID == currentPID && sameWindow && !approvedTitle.isEmpty
+            && currentTitle == approvedTitle
+    }
+}

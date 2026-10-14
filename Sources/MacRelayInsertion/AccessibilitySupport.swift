@@ -44,7 +44,8 @@ public enum AccessibilitySupport {
 public enum AutomationError: Error, LocalizedError {
     case permission, clipboardUnavailable, clipboardChanged, noField, protectedField, focusChanged
     case guardUnavailable, screenSharing, wisprNotRunning, noFreshDictation, receiverUpgrade
-    case unrecognizedPaste, screenSharingWindowUnavailable, screenSharingNameMismatch
+    case unrecognizedPaste, screenSharingWindowUnavailable, screenSharingNameMismatch,
+        screenSharingWindowChanged
     public var errorDescription: String? {
         switch self {
         case .permission:
@@ -64,6 +65,9 @@ public enum AutomationError: Error, LocalizedError {
             return "Return to the mini's Screen Sharing window. It must be focused for automatic delivery."
         case .screenSharingWindowUnavailable:
             return "Screen Sharing's active window could not be verified. Save the MacBook test report."
+        case .screenSharingWindowChanged:
+            return
+                "The chosen Screen Sharing window changed or is not focused. Choose the mini's window again."
         case .screenSharingNameMismatch:
             return
                 "The Screen Sharing window's name does not match the paired mini. Save the MacBook test report."

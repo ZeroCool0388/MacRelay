@@ -32,7 +32,7 @@ struct RelayPanel: View {
                         Text("Your text. Between your Macs.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("v0.2.1 test").font(.caption).foregroundStyle(.secondary)
+                    Text("v0.2.2 test").font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("This Mac", selection: $model.role) {
                     ForEach(RelayModel.Role.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -85,19 +85,39 @@ struct RelayPanel: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Wispr through Screen Sharing").font(.headline)
             Text("Experimental — needs a live dictation test.").font(.caption).foregroundStyle(.secondary)
+            if model.role == .sender, !model.sourceWindows.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Receiver: \(model.sourceReceiverName ?? "Paired Mac")", systemImage: "lock.shield")
+                    Text("Choose the Screen Sharing window showing this Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Picker("Window", selection: $model.selectedSourceWindowID) {
+                        Text("Choose window").tag(UUID?.none)
+                        ForEach(model.sourceWindows) { window in
+                            Text(window.label).tag(Optional(window.id))
+                        }
+                    }.disabled(model.automaticEnabled || model.isSending)
+                    HStack {
+                        Button("Show window") { model.showSelectedSourceWindow() }
+                            .disabled(model.selectedSourceWindowID == nil || model.automaticEnabled)
+                        Button("Change window") { model.prepareSourceWindows() }.disabled(model.isSending)
+                    }.font(.caption)
+                }
+            }
             Button(
                 model.automaticStarting
                     ? "Checking…"
                     : model.automaticEnabled
                         ? "Turn automatic mode off"
                         : model.role == .sender
-                            ? "Relay Wispr automatically" : "Insert dictation automatically"
+                            ? (model.sourceWindows.isEmpty
+                                ? "Choose Screen Sharing window" : "Relay Wispr from this window")
+                            : "Insert dictation automatically"
             ) {
                 model.toggleAutomatic()
             }.buttonStyle(.borderedProminent).disabled(model.automaticStarting || model.isSending)
             Text(
                 model.role == .sender
-                    ? "Use your usual Wispr dictation key. Keep one Screen Sharing window focused. Only new dictation for that window qualifies."
+                    ? "Choose the mini’s Screen Sharing window once. Then use your usual Wispr dictation key while that window is focused."
                     : "Words go into the focused text field. Password fields and known terminal apps are blocked. MacRelay never presses Enter."
             )
             .font(.caption).foregroundStyle(.secondary)
