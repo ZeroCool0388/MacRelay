@@ -22,7 +22,7 @@ public enum RelayError: Error, LocalizedError, Equatable {
         case .acknowledgementMismatch:
             return "Delivery acknowledgement could not be verified. Check the receiver."
         case .insertionRejected:
-            return "Insertion was stopped. Check the mini's focused field and automatic mode."
+            return "Insertion was stopped. Check the receiver's focused field and automatic mode."
         case .insertionUnconfirmed:
             return
                 "Insertion was attempted but could not be confirmed. Check the field before dictating again."

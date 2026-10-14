@@ -7,7 +7,7 @@ struct LocalAddressTests {
     @Test
     func onlyLocalNamesAndAddressesAreAllowed() {
         for value in [
-            "Mac-mini.local", "localhost", "192.168.1.12", "10.0.0.4", "172.16.0.1",
+            "receiver-test.local", "localhost", "192.168.1.12", "10.0.0.4", "172.16.0.1",
             "172.31.255.255", "169.254.2.3", "127.0.0.1", "::1", "fe80::1%en0", "fd00::2",
             "::ffff:192.168.0.4",
         ] {

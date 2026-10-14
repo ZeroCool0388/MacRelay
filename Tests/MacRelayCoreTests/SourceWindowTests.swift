@@ -27,8 +27,8 @@ import Testing
         #expect(!allowed(focused: false, main: true, count: 2))
     }
     @Test func explicitWindowChoiceAllowsAnAliasButRequiresExactLiveIdentity() {
-        let alias = "My development screen"
-        #expect(!PasteGuardPolicy.remoteTitle(alias, matches: "Example Mac mini"))
+        let alias = "Remote session"
+        #expect(!PasteGuardPolicy.remoteTitle(alias, matches: "Example receiver"))
         let bound = SourceBindingPolicy.matches(
             approvedPID: 42, currentPID: 42, sameWindow: true,
             approvedTitle: alias, currentTitle: alias)

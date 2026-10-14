@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.2.5 — Codex chat formatting
+## Unreleased
+
+- Rewrite public setup, installation and validation guidance around sender and receiver roles.
+- Remove personal test names and device-specific wording from documentation and UI text.
+- Keep runtime logic, protocol and permissions unchanged.
+
+## 0.2.5: Codex chat formatting
 
 - Permit surrounding-whitespace formatting only for Codex’s complete editable-text reader.
 - Keep words, punctuation, Unicode and internal spacing exact; refuse unchanged or whitespace-only results.
@@ -8,18 +14,18 @@
 - Request the current app’s macOS permission when the user clicks setup/automatic-mode buttons.
 - Document installation in the main Applications folder and permission renewal for development updates.
 
-The v0.2.4 report found matching text after surrounding-whitespace comparison. The sender still stopped because verification required an exact field representation. This update targets that difference; repeated Codex dictation still needs a live test. TextEdit’s exact verification and the Air’s protocol remain unchanged.
+A v0.2.4 report identified a surrounding-whitespace difference in the Codex field. This update scoped confirmation to that editor rule while preserving exact verification in other apps and the sender protocol.
 
-## 0.2.4 — editable-text confirmation
+## 0.2.4: editable-text confirmation
 
 - Check complete editable text through the Accessibility character-range API when the field supports it.
 - Pin that text reader before pasting; keep exact matching and reject unavailable, partial or changed results.
 - Allow up to 1.5 seconds for the app’s text representation to update, without repeating the paste.
 - Add metadata-only reader and mismatch comparisons; formatting diagnostics never count as success.
 
-The user confirmed two consecutive dictations in TextEdit with the v0.2.3 receiver. Codex’s chat field received a paste but failed the exposed-value confirmation and disabled the sender. This update adds a compatible text reader; the Codex live test is still pending. The Air’s v0.2.2 remains compatible.
+Limited live tests reported two consecutive confirmed dictations in TextEdit with a v0.2.3 receiver. A Codex paste failed exposed-value confirmation. This update added a complete editable-text reader; a new live test was needed.
 
-## 0.2.3 — receiver insertion
+## 0.2.3: receiver insertion
 
 - Use one checked native paste instead of relying on a writable selected-text attribute.
 - Keep generated shortcut modifiers separate from remote input and dictation keys.
@@ -27,9 +33,9 @@ The user confirmed two consecutive dictations in TextEdit with the v0.2.3 receiv
 - Record the insertion stage, verification reason and clipboard restoration as metadata only.
 - Add receiver transaction checks for delayed verification, focus changes, uncertain results and newer copies.
 
-The v0.2.2 sender reached the receiver, which reported an unconfirmed direct insertion. This update changes the receiver; an Air running v0.2.2 remains compatible. Real dictation is still awaiting a successful live test.
+A v0.2.2 sender reached the receiver, which reported an unconfirmed direct insertion. This receiver update replaced that insertion path; live validation remained pending at release.
 
-## 0.2.2 — explicit source window
+## 0.2.2: explicit source window
 
 - Show the authenticated receiver’s computer name during source setup.
 - Let the user explicitly choose and show the Screen Sharing window mapped to that receiver.
@@ -38,7 +44,7 @@ The v0.2.2 sender reached the receiver, which reported an unconfirmed direct ins
 
 The v0.2.1 live report identified the machine/window name comparison as the blocker. New automated checks do not replace the remaining live dictation test.
 
-## 0.2.1 — Screen Sharing window checks
+## 0.2.1: Screen Sharing window checks
 
 - Verify the focused receiver window without requiring the optional “standard window” label.
 - Use a single verified main window when the focused-window attribute is unavailable.
@@ -48,7 +54,7 @@ The v0.2.1 live report identified the machine/window name comparison as the bloc
 
 The first v0.2 live test detected and blocked a Wispr paste but rejected the source window. The complete live dictation path is still unproven.
 
-## 0.2.0 — experimental automatic dictation
+## 0.2.0: experimental automatic dictation
 
 - New Wispr dictation can be relayed without a separate send/copy/paste gesture.
 - Opt-in, read-only Wispr adapter with no replay of earlier records.
@@ -59,7 +65,7 @@ The first v0.2 live test detected and blocked a Wispr paste but rejected the sou
 
 Wispr’s database and paste behaviour are undocumented. The live two-Mac dictation test is still pending; this is not a proven public release.
 
-## 0.1.0 — initial development version
+## 0.1.0: initial development version
 
 - Native SwiftUI menu bar app with Send and Receive roles.
 - Explicit clipboard send and receiver copy shortcuts, with button equivalents.

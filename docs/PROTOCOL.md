@@ -42,6 +42,7 @@ Kinds:
 Experimental optional kinds:
 
 - `arm`: no text or token. With automatic insertion enabled, reserve the checked focused field and return `armed` with a fresh UUID token. Otherwise return `rejected`.
+- `cancel`: no text, plus a reservation token. Clear only the matching reservation and return `accepted`, including when it is already gone. Cancellation is allowed without Accessibility access and cannot cancel a newer token.
 - `insert`: non-empty validated text plus the reservation token. Consume a matching unexpired token **before** attempting insertion; check the destination again. Return `inserted` only after destination-text verification, `rejected` when refused before an attempt, or `unconfirmed` after an unverified attempt. Verification is exact by default. Codex’s full editable-text reader may accept boundary-whitespace formatting for changed, non-empty content; words, punctuation, Unicode and internal spacing remain exact.
 
 New receivers advertise `wispr-insertion-v1` in a `paired` acknowledgement only when automatic insertion is enabled and Accessibility is available. Optional receiver names let the sender display the authenticated receiver when the user chooses a source Screen Sharing window. These values are encrypted. Existing v0.1 probes/clipboard messages remain compatible; old receivers do not advertise the capability, so new senders refuse automatic mode. Unknown kinds are rejected.

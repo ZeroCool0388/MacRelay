@@ -29,7 +29,7 @@ struct RelayPanel: View {
                         .font(.title).foregroundStyle(.blue)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("MacRelay").font(.headline)
-                        Text("Your text. Between your Macs.").font(.caption).foregroundStyle(.secondary)
+                        Text("Text transfer between Macs.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text("v0.2.6 test").font(.caption).foregroundStyle(.secondary)
@@ -37,8 +37,10 @@ struct RelayPanel: View {
                 Picker("This Mac", selection: $model.role) {
                     ForEach(RelayModel.Role.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }.pickerStyle(.segmented).disabled(model.isSending)
-                Text(model.role == .sender ? "Use Send on your MacBook." : "Use Receive on your Mac mini.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    model.role == .sender
+                        ? "Use Send on this Mac to send text." : "Use Receive on this Mac to receive text."
+                ).font(.caption).foregroundStyle(.secondary)
                 Text(model.status).font(.callout).fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Status: \(model.status)")
                 automaticControls
@@ -77,14 +79,14 @@ struct RelayPanel: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
-                "The old code will stop working. Any waiting text will be discarded. Pair the MacBook again with the new code."
+                "The old code will stop working. Any waiting text will be discarded. Pair the sender again with the new code."
             )
         }
     }
     private var automaticControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Wispr through Screen Sharing").font(.headline)
-            Text("Experimental — needs a live dictation test.").font(.caption).foregroundStyle(.secondary)
+            Text("Experimental. Check each destination app before use.").font(.caption).foregroundStyle(.secondary)
             if model.role == .sender, !model.sourceWindows.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Receiver: \(model.sourceReceiverName ?? "Paired Mac")", systemImage: "lock.shield")
@@ -117,7 +119,7 @@ struct RelayPanel: View {
             }.buttonStyle(.borderedProminent).disabled(model.automaticStarting || model.isSending)
             Text(
                 model.role == .sender
-                    ? "Choose the mini’s Screen Sharing window once. Then use your usual Wispr dictation key while that window is focused."
+                    ? "Choose the receiver's Screen Sharing window once. Then use your usual Wispr dictation key while that window is focused."
                     : "Words go into the focused text field. Password fields and known terminal apps are blocked. MacRelay never presses Enter."
             )
             .font(.caption).foregroundStyle(.secondary)
@@ -127,7 +129,7 @@ struct RelayPanel: View {
                 Button("Save test report") { model.saveTestReport() }
             }.font(.caption)
             Text(
-                "Allow MacRelay on both Macs, then turn automatic mode on. A temporary clipboard change may be needed on the mini; it is restored if no other app has changed it."
+                "Allow Accessibility on both Macs, then enable automatic mode. The receiver needs an empty or plain-text-only clipboard. Restoration requires verified insertion and an unchanged clipboard."
             )
             .font(.caption).foregroundStyle(.secondary)
             Divider()
@@ -146,7 +148,7 @@ struct RelayPanel: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Divider()
             }
-            Text(model.senderPaired ? "Pair with a receiver again" : "Pair with your Mac mini").font(
+            Text(model.senderPaired ? "Pair with a receiver again" : "Pair with a receiver").font(
                 .headline)
             Toggle("Enter local address manually", isOn: $model.useAddress)
             if model.useAddress {
@@ -167,7 +169,7 @@ struct RelayPanel: View {
                 .textFieldStyle(.roundedBorder)
             Button("Verify and pair") { model.pairSender() }
                 .disabled(model.isSending || model.pairingInput.isEmpty)
-            Text("Find the code in MacRelay on the Mac mini. Transfer it through a route you trust.")
+            Text("Find the code in MacRelay on the receiver. Transfer it through a route you trust.")
                 .font(.caption).foregroundStyle(.secondary)
         }.disabled(model.isSending)
     }
@@ -189,7 +191,7 @@ struct RelayPanel: View {
             }
             if let code = model.pairingCode {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Pairing code — keep private").font(.caption).bold()
+                    Text("Pairing code: keep private").font(.caption).bold()
                     Text(code).font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     HStack {

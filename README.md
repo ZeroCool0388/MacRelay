@@ -1,114 +1,124 @@
 # MacRelay
 
-**Dictate on your MacBook. Put the words into your Mac mini’s focused text field.**
+MacRelay is a macOS menu bar app that sends plain text directly between two Macs on a local network. One Mac sends text and the other receives it. Both roles are included in the same app.
 
-MacRelay is a small macOS menu bar app for using Wispr Flow through Apple Screen Sharing. The Macs connect directly using a private pairing key and encrypted transfers. MacRelay has no account, cloud relay, analytics or saved text history.
+Use it when you work across two Macs and want explicit text transfer without an account, cloud relay or saved text history. Manual transfer sends clipboard text on request. An experimental mode can relay new Wispr Flow dictation into a checked text field while you use Apple Screen Sharing.
 
-**One app on both Macs.** MacRelay includes both Send and Receive modes. Install the same version from the same download on each Mac; choose Send on the MacBook and Receive on the mini.
+## Requirements
 
-**Automatic mode is experimental.** The user has confirmed two consecutive dictations into TextEdit and, subsequently, Codex through Screen Sharing. Longer use and other apps still need testing. See [validation](docs/VALIDATION.md). The original manual transfer remains available as a fallback.
+- macOS 14 or later on both Macs.
+- Apple developer tools with Swift 6 or later to build from source.
+- A local network that allows the Macs to connect directly.
+- Wispr Flow on the sender and Apple Screen Sharing configured separately for automatic dictation. Neither is needed for manual transfer.
 
-## Automatic mode
+There are no third-party package dependencies. AppKit, Accessibility, Network, CryptoKit and SQLite are provided by macOS. The app targets macOS; Linux cannot build the AppKit app or run the full test suite.
 
-1. Wispr makes a new dictation for Screen Sharing.
-2. MacRelay stops Wispr’s usual paste event from reaching the remote session.
-3. The mini checks and briefly reserves its focused text field.
-4. MacRelay reads the new, completed words from Wispr’s local data and sends them directly to the mini.
-5. The mini checks the same field and selection again, inserts once, and checks the result.
+## Build and install
 
-Use your usual Wispr dictation key. There is no extra send, copy or paste shortcut.
-
-This uses an **independent, undocumented adapter**, not an official Wispr API. The data-field layout was checked against Wispr Flow 1.6.1147. Wispr updates may break it. If the data, paste event, destination or result cannot be checked, MacRelay stops automatic delivery. It never retries an uncertain insertion.
-
-## Build and open
-
-You need macOS 14 or later and Apple’s developer tools with Swift 6 or later. There are no third-party packages; SQLite, AppKit, Accessibility, Network and CryptoKit come with macOS.
+Download or clone this repository, then run these commands from its directory:
 
 ```sh
-git clone https://github.com/ZeroCool0388/MacRelay.git
-cd MacRelay
-# For the experimental automatic version:
-git switch codex/automatic-wispr
 ./scripts/test.sh
 ./scripts/build-app.sh
 ./scripts/package-app.sh
 ```
 
-Move `build/MacRelay.app` into the main **Applications** folder (`/Applications`) and open that installed copy. Quit MacRelay before replacing it with a new build. This makes it available in the standard app picker when adding permissions.
+Install Apple Command Line Tools with `xcode-select --install` if needed, or use Xcode with Swift 6 or later. You can also open `Package.swift` in Xcode. The build script uses a release configuration by default; pass `debug` for a debug build.
 
-If developer tools are missing, install Apple’s Command Line Tools with `xcode-select --install`, or use Xcode. The scripts handle tool differences between supported versions.
+The build creates `build/MacRelay.app`. The package script uses that existing app to create `build/MacRelay-<version>-macOS.zip` and a `.sha256` checksum file. The archive includes the app, an installation guide and the licence. To choose another output directory, pass it to `./scripts/package-app.sh`.
 
-The app appears in the menu bar, without a Dock icon. The package script creates one `build/MacRelay-<version>-macOS.zip` containing the app, installation guide and licence, plus a checksum file. Install that same archive on both Macs with the same processor architecture. An Apple Silicon build covers an Apple Silicon MacBook Air and an M4 Mac mini. There are no separate sender and receiver apps. See [installation](docs/INSTALL.md). These are locally signed development builds, not notarized public downloads. Building from source is the supported route.
+Quit any running copy, move the app into `/Applications`, then open the installed copy. MacRelay appears in the menu bar and has no Dock icon. Install the same app version on both Macs. A package contains the architecture of the Mac that built it, so use a compatible build for each Mac; the scripts do not create a universal binary.
 
-Keep the app in the same location after pairing. These development builds use a signature tied to each build, so an update can require fresh Keychain or Accessibility approval. Click **Open Accessibility settings** in MacRelay to ask macOS for access to the current app, then allow the installed Applications copy. A switch left on from an earlier build is not proof the current process is allowed. You can also open `Package.swift` in Xcode.
+Builds use an ad-hoc local signature. They are not Developer ID signed or notarized. Keep the app in a consistent location. Replacing a build may require renewed Keychain or Accessibility approval. See [the installation guide](docs/INSTALL.md) for updates and packaged builds.
 
-## Pair the Macs
+## First-time setup
 
-1. On the **mini**, choose **Receive**, then **Create pairing code and start**.
-2. On the **MacBook**, choose **Send** and select the receiver. A manual local address is also available.
-3. Enter the mini’s full `MR1-…` code and click **Verify and pair**. Keep the code private.
-4. Allow **Local Network** access and incoming connections when macOS asks.
+Choose which Mac will send and which will receive. You can change roles later.
 
-Bonjour finds nearby receivers. The pairing key verifies the intended receiver. Manual addresses must be `localhost`, a `.local` name, or a private local IP address. The default port is `45821`. Guest Wi-Fi may prevent Macs from connecting.
+### Receiver Mac
 
-Pairing keys stay in each Mac’s Keychain without iCloud Keychain syncing. Replacing the mini’s code revokes the old pairing. Receiving starts when you create the code; after reopening the app, start it again.
+1. Open MacRelay and choose **Receive**.
+2. Click **Create pairing code and start**. Receiving starts and a private pairing code appears.
+3. Transfer the full code to the sender through a route you trust. Keep it out of public messages and issue reports.
+4. Allow Local Network access and incoming connections if macOS asks.
 
-## Try automatic dictation
+### Sender Mac
 
-Use the **same experimental version on both Macs**, installed from the same package. Existing pairing keys remain usable. Temporary mixed-version tests are recorded in the validation history; they are not the installation plan.
+1. Open MacRelay and choose **Send**.
+2. Select the receiver in the nearby list. If discovery fails, choose **Enter local address manually** and enter its local address and port.
+3. Enter the full pairing code and click **Verify and pair**.
+4. Allow Local Network access if macOS asks.
 
-1. Allow **MacRelay** in **System Settings → Privacy & Security → Accessibility** on both Macs. On newer macOS this permission is called **Device Control and Data Access**. The app includes a button to open that page.
-2. On the **mini**, click **Insert dictation automatically**.
-3. On the **MacBook**, click **Choose Screen Sharing window**. Check that the receiver name is your mini, choose the window showing it, then click **Relay Wispr from this window**.
-4. Keep the chosen Screen Sharing window focused. A separate connections browser is allowed. The window choice is explicit because macOS may expose a different connection label from the visible computer name.
-5. Click into a blank **TextEdit** document on the mini, then dictate normally using Wispr on the MacBook.
-6. Check the words appear **once**, without any relay, copy or paste action.
+Bonjour discovers nearby receivers. Pairing verifies the receiver using the shared secret, rather than trusting its advertised name. Manual addresses must be a local host name ending in `.local`, `localhost`, or a private, link-local or loopback IP address. The default receiver port is `45821`.
 
-Turn off Screen Sharing’s **Share Clipboard** option during this test, so its own sync cannot affect the result. MacRelay does not change that setting for you.
+Pairing keys stay in each Mac's local Keychain and do not sync through iCloud Keychain. After reopening the receiver app, click **Start receiving**. Replacing its pairing code revokes the old pairing; pair the sender again with the new code.
 
-Automatic mode starts **off** each time MacRelay opens. Turning it on ignores earlier Wispr records, including unfinished ones already present. Changing roles, stopping receiving or quitting cancels automatic work. Changing the chosen source window, its title or the destination field during delivery stops the attempt. The window choice is kept only in memory; choose again after quitting the app or opening a new remote session.
+## Manual text transfer
 
-A confirmed result means the field’s exposed text matches the expected insertion. Some apps do not expose enough information through Accessibility and are refused. Password fields and known terminal apps are blocked. MacRelay never presses Enter or submits a form.
+1. Copy plain text on the sender. Turn automatic mode off if it is enabled.
+2. Click **Send clipboard text**, or press **Shift + Option + Command + S**. Paired senders have these controls under **Manual transfer and pairing**.
+3. On the receiver, click **Copy received text**, or press **Shift + Option + Command + R**.
+4. Paste into the destination app yourself.
 
-The receiver prefers the field’s complete editable text through Accessibility’s character-range API when available. It chooses that reader before insertion and checks the result using the same reader. Other fields use their exposed value. Codex’s chat editor has a narrow compatibility rule: differences only in surrounding whitespace may confirm a changed, non-empty complete text result. Words, punctuation, Unicode and internal spacing must still match. The text sent and pasted is unchanged. Other apps require an exact match. An unavailable reader remains unconfirmed.
+Receiving manual text does not change the clipboard. The receiver holds one item in memory for up to two minutes. Another item cannot replace it while it is waiting. Copy or discard the item before sending another. Each transfer is limited to 64 KiB of plain text in UTF-8; files, images and formatting are not transferred.
 
-If a test fails, use **Save test report** on the affected Mac. It saves only check results and counters in the existing iCloud Drive `MacRelay` folder, or on the Desktop if that folder is unavailable. It contains no dictated words, field contents, clipboard contents, keys, audio or login details. Keep reports out of public issues if they include information you want private.
+## Permissions
 
-## Clipboard and privacy
+**Local Network:** allow MacRelay on both Macs when prompted. If connections fail, check the Local Network entry in System Settings, the firewall and network isolation settings. Guest networks may block discovery or direct connections.
 
-The automatic sender does not watch clipboard changes. When stopping a Wispr-generated paste event, it briefly reads that event’s current clipboard text and keeps only a fingerprint to match against a new Wispr dictation. The fingerprint must match one stable, completed dictation. Older unfinished entries or entries with different words do not prevent that unique match. Two matching entries are refused. Consumed and older pending entries cannot be relayed afterward. It never sends an ordinary clipboard item automatically. It opens `~/Library/Application Support/Wispr Flow/flow.sqlite` read-only. It reads metadata and completed text for new Screen Sharing dictations while the mode is enabled. It does not read earlier transcript bodies, audio, screenshots, account data or settings. MacRelay does not change Wispr’s own processing or history settings.
+**Accessibility:** automatic dictation requires MacRelay to have this permission on both Macs. Use **Open Accessibility settings**, then allow the installed app under **System Settings > Privacy & Security > Accessibility**. Some macOS versions call this **Device Control and Data Access**. Manual transfer and its global shortcuts do not require Accessibility.
 
-The receiver checks the focused field through Accessibility, temporarily puts the words on the clipboard, sends one paste to the checked app, and restores the previous clipboard items after verified insertion only if its own clipboard write is still present. If insertion is unconfirmed, the words stay on the clipboard so a delayed paste cannot insert your previous copy. Another automatic paste is refused while that temporary clipboard item remains. A newer copy from you or another app is left alone. Automatic insertion requires an empty or plain-text-only clipboard on the mini; rich text, images, PDFs, files and other flavors are refused before their data is read. Plain text over 8 MiB or unavailable to preserve safely also stops insertion. It does not write the field’s selected-text attribute: some fields report that attribute as writable without completing an insertion.
+An enabled switch for an older build does not prove that the current process is allowed. After replacing the app, quit and reopen it, request permission for the current copy and renew the entry if needed.
 
-MacRelay saves role and receiver settings, and pairing keys. Transferred text, field checks and delivery tokens stay in memory. Other software, Wispr’s history, clipboard managers, operating system swap, screenshots and crash reports are outside MacRelay’s control.
+## Experimental automatic Wispr insertion
 
-See [SECURITY.md](SECURITY.md) for the connection design and limits.
+This mode uses an independent, undocumented adapter to Wispr Flow's local data. It is not an official Wispr integration. The data layout was checked against Wispr Flow 1.6.1147; later versions may break it. Limited two-Mac tests have reported successful consecutive dictations in TextEdit and Codex. They do not establish reliability across apps or longer sessions. See [validation notes](docs/VALIDATION.md).
 
-## Manual fallback
+1. Pair the Macs and start receiving. Allow Accessibility on both Macs.
+2. Open the receiver's desktop in Apple Screen Sharing on the sender. Turn off Screen Sharing's **Share Clipboard** option to avoid interference from its clipboard sync.
+3. On the receiver, click **Insert dictation automatically**.
+4. On the sender, click **Choose Screen Sharing window**. Check the displayed receiver, choose the window showing it, then click **Relay Wispr from this window**.
+5. Keep that window focused. Click a blank TextEdit document on the receiver and dictate using Wispr on the sender.
+6. Check that the words appear once before trying your usual destination app.
 
-With automatic mode off, expand **Manual transfer and pairing** on the sender:
+MacRelay blocks a recognized Wispr paste event, matches it to one new completed dictation, reserves the receiver's focused field, sends the text and attempts one checked paste. It checks the field, selection and result through Accessibility. It never presses Enter or submits a form.
 
-- **Shift + Option + Command + S** sends the current clipboard’s plain text once.
-- The mini keeps one received item in memory for up to two minutes.
-- **Copy received text**, or **Shift + Option + Command + R**, deliberately changes the mini’s clipboard. Paste normally afterward.
-- A second item cannot replace one already waiting. Receiving a manual item does not change the clipboard.
+Automatic mode starts off after each launch. Earlier dictations are ignored when enabling it. The window choice stays in memory and must be made again after reopening the app or creating a new remote session. Focus changes, changed fields, ambiguous records, missing permissions and unconfirmed results stop delivery. Password fields, known terminal apps and fields that cannot be checked are refused. MacRelay never retries an uncertain insertion.
 
-Plain text only, up to 64 KiB per dictation or transfer. Images, files, formatting, multiple remote sessions and internet relay connections are outside this version.
+Automatic insertion temporarily uses the receiver's clipboard. It requires an empty or plain-text-only clipboard; rich text, images, PDFs, files and custom flavors are refused before their data is loaded. Retained plain text is limited to 8 MiB, checked after reading. After verified insertion, the previous clipboard is restored only if MacRelay still owns the temporary write. Newer copies are left alone. If insertion is unconfirmed, the dictation stays on the clipboard so a queued paste cannot read the previous copy. Another automatic paste is refused while that temporary item remains. Check the destination and any pending paste before replacing it.
+
+Verification normally requires an exact text result. Codex's complete editable-text reader has a narrow exception for surrounding whitespace in changed, non-empty content. Words, punctuation, Unicode and internal spacing must still match. This does not prove compatibility with other editors.
+
+## Security and privacy
+
+- Text and acknowledgements are encrypted. Both Macs authenticate using the private pairing secret.
+- Connections are restricted to local address ranges. There is no internet relay, account or analytics service. Do not expose the receiver port to the internet.
+- MacRelay saves settings and pairing keys, but no transferred-text history. Manual waiting text, reservations and field checks stay in memory.
+- Other apps, clipboard managers, operating system sharing, Wispr's own history, swap and crash reports are outside MacRelay's control.
+- The protocol has automated tests but has not had an independent security audit. Automatic mode remains experimental.
+
+Read [SECURITY.md](SECURITY.md) for the protocol, limits, revocation and private vulnerability reporting.
 
 ## Troubleshooting
 
-| Problem | What to try |
+| Problem | What to check |
 | --- | --- |
-| No receiver | Start receiving; check Local Network permission and Wi-Fi. Try a manual local address. |
-| Automatic mode will not start | Update both Macs, allow Accessibility, and enable automatic insertion on the mini first. |
-| Screen Sharing check fails | Choose the window showing the paired mini. Use **Show window** to check your choice. Re-select after closing, changing or reconnecting the session. |
+| No nearby receiver | Start receiving, allow Local Network on both Macs and check network isolation. Try a manual local address. |
+| Connection fails | Check the receiver port, firewall and pairing code. Install compatible versions on both Macs. |
+| Pairing was replaced | Enter the receiver's new code and verify pairing again. |
+| Shortcut does nothing | Use the matching button. Check for conflicts with another app's shortcuts. |
+| Automatic mode will not start | Allow Accessibility, run Wispr on the sender and enable receiver insertion first. |
+| Screen Sharing check fails | Choose the window showing the paired receiver. Use **Show window** to check it. Choose again after reconnecting or changing the session. |
+| Clipboard is refused | Check any pending paste, then copy a small plain-text-only item on the receiver. Rich or binary clipboard items are unsupported. |
 | Field cannot be checked | Try a blank TextEdit document. Some apps do not expose editable text or selection. |
-| Wispr’s paste is unrecognized | Save the MacBook test report. Automatic transfer is refused to avoid sending the words twice. |
-| Insertion is unconfirmed | Check the field before dictating again. MacRelay does not retry. |
-| Permission was granted but still fails | Quit and reopen MacRelay. A rebuilt app may need its Accessibility entry renewed. |
+| Wispr data or paste is unrecognized | The adapter may be incompatible with that Wispr version. Use manual transfer and save a test report. |
+| Insertion is unconfirmed | Check the destination and pending paste before dictating again. MacRelay does not retry or restore the previous clipboard. |
+| Permission still fails after an update | Quit and reopen MacRelay and renew permission for the installed copy. |
 
-## Contributing
+**Save test report** writes check results and counters to an existing MacRelay folder in iCloud Drive, or to the Desktop if that folder is unavailable. It saves no dictated words, field contents, clipboard contents, keys, audio or login details. Review reports before sharing them and remove private device or network details.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md), [the roadmap](docs/ROADMAP.md) and [the protocol](docs/PROTOCOL.md). Preserve the automatic mode’s destination checks, single-attempt delivery, explicit opt-in and lack of saved text history.
+## Contributing and licence
 
-[MIT licensed](LICENSE).
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [the roadmap](docs/ROADMAP.md) and [the protocol](docs/PROTOCOL.md). Use the existing issue templates for bug reports and feature requests. Keep private data out of public reports.
+
+MacRelay is licensed under the [MIT licence](LICENSE), copyright 2026 MacRelay contributors.

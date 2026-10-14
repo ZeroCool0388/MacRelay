@@ -89,10 +89,10 @@ import Testing
                 keyCode: 9, sourcePID: 100, wisprPIDs: known, frontmostApp: "com.apple.TextEdit"))
     }
     @Test func screenSharingTitleMustMatchPairedReceiver() {
-        #expect(PasteGuardPolicy.remoteTitle("Steve’s Mac mini", matches: "Steve's Mac mini"))
-        #expect(PasteGuardPolicy.remoteTitle("steves-mac-mini.local", matches: "steves-mac-mini.local"))
+        #expect(PasteGuardPolicy.remoteTitle("Receiver’s Mac", matches: "Receiver's Mac"))
+        #expect(PasteGuardPolicy.remoteTitle("receiver-test.local", matches: "receiver-test.local"))
         #expect(PasteGuardPolicy.remoteTitle("Test Mac (High Performance)", matches: "Test Mac"))
-        #expect(!PasteGuardPolicy.remoteTitle("Test MacBook", matches: "Test Mac"))
+        #expect(!PasteGuardPolicy.remoteTitle("Test Mac Extra", matches: "Test Mac"))
         #expect(!PasteGuardPolicy.remoteTitle("Other Mac", matches: "Test Mac"))
         #expect(!PasteGuardPolicy.remoteTitle("Anything", matches: ""))
     }

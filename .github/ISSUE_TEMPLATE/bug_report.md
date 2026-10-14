@@ -9,8 +9,8 @@ about: Something is not working
 
 **Steps to reproduce**
 
-**App and macOS versions**
+**App version, macOS versions and processor architectures**
 
-**Which Mac was sending?**
+**Sender and receiver roles; manual or automatic mode**
 
-Use invented sample text. Do not include pairing codes, private transcriptions, or credentials. For security issues, see SECURITY.md.
+Use invented sample text. Do not include pairing codes, private transcriptions, credentials, device names or network addresses. For security issues, see SECURITY.md.

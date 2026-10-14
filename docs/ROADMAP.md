@@ -1,35 +1,30 @@
 # Roadmap
 
-## Primary goal: seamless Wispr dictation
+MacRelay provides explicit local text transfer between a sender Mac and a receiver Mac. Experimental Wispr relay adds checked insertion through Apple Screen Sharing. Manual transfer remains available when automatic mode is unsuitable.
 
-Dictate normally on the MacBook while using Screen Sharing. The words appear once in the mini’s focused text field, without an extra send, copy or paste action.
+## Current automatic mode
 
-The manual v0.1 established pairing and local transfer. It does not solve this goal by itself.
-
-## v0.2 experimental: automatic local adapter
-
-Implemented for testing:
-
-- Read-only access to new, completed Wispr records, with an enable-time baseline.
-- A narrow blocker for Wispr-generated paste events in Screen Sharing.
-- One Screen Sharing session, checked against the paired receiver’s name.
-- Authenticated, short-lived, one-use field reservations.
-- Focus, value and selection checks before insertion; result verification afterward.
-- Checked native paste, with guarded clipboard restoration and read-only result verification.
+- Read-only access to new, completed Wispr records, with a baseline set when enabling.
+- A blocker for recognized Wispr-generated paste events in Screen Sharing.
+- One explicitly chosen Screen Sharing session for the paired receiver.
+- Authenticated, short-lived, single-use field reservations and token-specific cancellation.
+- Focus, value and selection checks before insertion and result verification afterward.
+- One native paste, with guarded clipboard restoration only after verified insertion.
+- Refusal of unsupported clipboard flavors and overlapping unconfirmed pastes.
 - Metadata-only test reports, no saved text history and no uncertain-delivery retries.
 
-The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147. The user has verified two consecutive confirmed dictations through Screen Sharing into TextEdit, and subsequently into Codex with the same v0.2.6 app on both Macs. These are bounded live tests; see [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
+The Wispr data layout and paste events are undocumented. The schema was checked against Wispr Flow 1.6.1147. Limited live tests reported two consecutive confirmed dictations into TextEdit and Codex. See [validation notes](VALIDATION.md) for the evidence and limits. No official Wispr integration is claimed.
 
-## Next gates
+## Next checks
 
-1. Extend the successful two-dictation checks into longer everyday sessions. Independently check clipboard-sync interference and the paste blocker during those sessions.
-2. Test rapid dictations, changed focus/selection, ordinary user paste, Unicode, disconnection and Wispr restart/update.
-3. Test supported everyday apps individually. Keep unsupported fields blocked rather than inserting blindly.
-4. Investigate an official completion signal/API with Wispr. Replace the local adapter if a reliable supported interface becomes available.
-5. Improve first setup, connection health and permission guidance after the core dictation path works.
+1. Test longer sessions, rapid dictations, clipboard interference and repeated enable/disable cycles.
+2. Test focus and selection changes, ordinary user paste, Unicode, disconnection and Wispr restart or update.
+3. Check individual destination apps and keep unsupported fields refused.
+4. Investigate a supported Wispr completion interface that could replace the local adapter.
+5. Improve setup, connection health and permission guidance based on reproducible reports.
 
-## Before broader distribution
+## Distribution
 
-Independent security review; signed and notarized Apple Silicon/Intel downloads; clearer pairing/revocation; a supported-app compatibility list. Configurable two-key shortcuts may improve the manual fallback, but are not a substitute for seamless dictation.
+Before broader distribution, obtain independent security review, provide signed and notarized builds for supported architectures, and publish a tested app compatibility list. Configurable shortcuts may improve manual transfer.
 
-Remote-network support is later work. No cloud relay or persistent MacRelay transcript archive is planned.
+Internet relay and a persistent MacRelay transcript archive are outside the current scope.

@@ -81,33 +81,33 @@ public enum AutomationError: Error, LocalizedError {
             return
                 "Allow MacRelay in Privacy & Security → Accessibility (Device Control and Data Access on newer macOS), then enable automatic mode again."
         case .clipboardUnavailable:
-            return "The mini's clipboard could not be preserved. Nothing was inserted."
+            return "The receiver's clipboard could not be preserved. Nothing was inserted."
         case .clipboardUnsupported:
             return
-                "Automatic insertion needs an empty or plain-text-only clipboard on the mini. Check any pending paste, then copy plain text and try again. Nothing was inserted."
+                "Automatic insertion needs an empty or plain-text-only clipboard on the receiver. Check any pending paste, then copy plain text and try again. Nothing was inserted."
         case .clipboardChanged: return "The clipboard changed. Insertion was stopped."
         case .noField:
-            return "Click into an editable text field on the mini. This field could not be checked safely."
+            return "Click into an editable text field on the receiver. This field could not be checked safely."
         case .protectedField: return "Automatic insertion is disabled for password fields and terminals."
         case .focusChanged: return "The focused app, field or selection changed. Nothing was inserted."
         case .guardUnavailable:
             return
                 "Wispr's paste blocker is unavailable. Automatic mode is off. Check Accessibility permission."
         case .screenSharing:
-            return "Return to the mini's Screen Sharing window. It must be focused for automatic delivery."
+            return "Return to the receiver's Screen Sharing window. It must be focused for automatic delivery."
         case .screenSharingWindowUnavailable:
-            return "Screen Sharing's active window could not be verified. Save the MacBook test report."
+            return "Screen Sharing's active window could not be verified. Save the sender test report."
         case .screenSharingWindowChanged:
             return
-                "The chosen Screen Sharing window changed or is not focused. Choose the mini's window again."
+                "The chosen Screen Sharing window changed or is not focused. Choose the receiver's window again."
         case .screenSharingNameMismatch:
             return
-                "The Screen Sharing window's name does not match the paired mini. Save the MacBook test report."
-        case .wisprNotRunning: return "Open Wispr Flow on the MacBook, then enable automatic mode again."
+                "The Screen Sharing window's name does not match the paired receiver. Save the sender test report."
+        case .wisprNotRunning: return "Open Wispr Flow on the sender, then enable automatic mode again."
         case .noFreshDictation:
             return "No matching completed dictation was found. Check Wispr and try a new dictation."
         case .receiverUpgrade:
-            return "Update MacRelay on the mini and enable Insert dictation automatically there."
+            return "Update MacRelay on the receiver and enable Insert dictation automatically there."
         case .unrecognizedPaste:
             return "Wispr finished, but its paste event was not recognized. Nothing was sent automatically."
         }
