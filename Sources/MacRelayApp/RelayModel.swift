@@ -100,7 +100,11 @@ final class RelayModel: ObservableObject {
         receiver.onState = { [weak self] state in
             guard let self else { return }
             self.status = state
-            if state.hasPrefix("Receiver unavailable") { self.receiverRunning = false }
+            if state.hasPrefix("Receiver unavailable") {
+                self.receiverRunning = false
+                self.stopAutomatic()
+                self.automaticFailed = true
+            }
         }
         receiver.onTransfer = { [weak self] transfer in
             guard let self, self.role == .receiver, self.receiverRunning else {

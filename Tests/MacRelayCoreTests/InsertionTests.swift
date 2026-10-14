@@ -23,6 +23,20 @@ import Testing
         let afterClear = permit.consume(cleared, now: now)
         #expect(!afterClear)
     }
+    @Test func clearedReservationStaysInvalidAfterRearming() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var permit = InsertionPermit()
+        let stale = try permit.arm(now: now)
+        // Listener failure clears the reservation before automatic mode can be enabled again.
+        permit.clear()
+        let afterFailure = permit.consume(stale, now: now)
+        #expect(!afterFailure)
+        let fresh = try permit.arm(now: now)
+        let afterRearming = permit.consume(stale, now: now)
+        #expect(!afterRearming)
+        let consumed = permit.consume(fresh, now: now)
+        #expect(consumed)
+    }
     @Test func utf16SelectionPreservesUnicodeAndRefusesInvalidRanges() throws {
         #expect(
             try InsertionPolicy.replacingSelection(
