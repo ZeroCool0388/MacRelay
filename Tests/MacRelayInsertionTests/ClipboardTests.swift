@@ -4,17 +4,26 @@ import Testing
 @testable import MacRelayInsertion
 
 // Private named pasteboards only; never read or change the user's general clipboard.
+final class ClipboardDataProvider: NSObject, NSPasteboardItemDataProvider {
+    var requestedTypes: [NSPasteboard.PasteboardType] = []
+    func pasteboard(
+        _ pasteboard: NSPasteboard?, item: NSPasteboardItem,
+        provideDataForType type: NSPasteboard.PasteboardType
+    ) {
+        requestedTypes.append(type)
+        item.setData(Data([0]), forType: type)
+    }
+}
+
 @Suite(.serialized) @MainActor struct ClipboardTests {
     private func board() -> NSPasteboard {
         NSPasteboard(name: .init("org.macrelay.test." + UUID().uuidString))
     }
-    @Test func restoresEveryItemAndTypeAfterOwnedWrite() throws {
+    @Test func restoresEveryPlainTextItemAfterOwnedWrite() throws {
         let pasteboard = board()
         defer { pasteboard.releaseGlobally() }
-        let custom = NSPasteboard.PasteboardType("org.macrelay.test.binary")
         let first = NSPasteboardItem()
         first.setString("Original", forType: .string)
-        first.setData(Data([0, 1, 255]), forType: custom)
         let second = NSPasteboardItem()
         second.setString("Second", forType: .string)
         #expect(pasteboard.writeObjects([first, second]))
@@ -25,8 +34,26 @@ import Testing
         #expect(restored)
         #expect(pasteboard.pasteboardItems?.count == 2)
         #expect(pasteboard.pasteboardItems?.first?.string(forType: .string) == "Original")
-        #expect(pasteboard.pasteboardItems?.first?.data(forType: custom) == Data([0, 1, 255]))
         #expect(pasteboard.pasteboardItems?.last?.string(forType: .string) == "Second")
+    }
+    @Test func nonPlainFlavorsAreRefusedBeforeLoadingAnyItem() throws {
+        for type in [
+            NSPasteboard.PasteboardType.pdf, .tiff, .rtf, .fileURL,
+            .init("org.macrelay.test.binary"),
+        ] {
+            let pasteboard = board()
+            defer { pasteboard.releaseGlobally() }
+            let provider = ClipboardDataProvider()
+            let plain = NSPasteboardItem()
+            plain.setDataProvider(provider, forTypes: [.string])
+            let unsupported = NSPasteboardItem()
+            unsupported.setDataProvider(provider, forTypes: [type])
+            #expect(pasteboard.writeObjects([plain, unsupported]))
+            let originalCount = pasteboard.changeCount
+            #expect(throws: AutomationError.clipboardUnsupported) { try ClipboardSnapshot(pasteboard) }
+            #expect(provider.requestedTypes.isEmpty)
+            #expect(pasteboard.changeCount == originalCount)
+        }
     }
     @Test func neverRestoresOverAnotherClipboardWriter() throws {
         let pasteboard = board()
@@ -48,8 +75,7 @@ import Testing
         pasteboard.setString("Temporary", forType: .string)
         #expect(empty.restore(pasteboard, ifUnchanged: pasteboard.changeCount))
         #expect(pasteboard.pasteboardItems?.isEmpty != false)
-        pasteboard.setData(
-            Data(repeating: 0, count: 8 * 1024 * 1024 + 1), forType: .init("org.macrelay.test.large"))
+        pasteboard.setString(String(repeating: "a", count: 8 * 1024 * 1024 + 1), forType: .string)
         #expect(throws: AutomationError.clipboardUnavailable) { try ClipboardSnapshot(pasteboard) }
     }
 }

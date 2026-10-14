@@ -147,7 +147,8 @@ final class RelayModel: ObservableObject {
                     ? "Dictation inserted in the focused field."
                     : result == .unconfirmed
                         ? "Insertion was attempted. Check the field before dictating again."
-                        : "Insertion stopped because the field, selection or permission changed."
+                        : self.insertion.testDetails["insertionFailure"]
+                            ?? "Insertion stopped because the field, selection or permission changed."
                 return Acknowledgement(id: transfer.id, status: result)
             }
             let ack = try self.inbox.receive(transfer)

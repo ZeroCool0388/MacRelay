@@ -19,6 +19,8 @@ struct FieldTextVerification {
         source = fullRangeText == nil ? "value" : "full-range"
         let body = fullRangeText ?? value
         let replacement = try InsertionPolicy.replacingSelection(in: body, range: selection, text: text)
+        // Unchanged text cannot prove that a queued paste has consumed the temporary clipboard.
+        guard Self.digest(replacement) != Self.digest(body) else { throw RelayError.insertionRejected }
         expectedText = replacement
         expected = Self.digest(replacement)
         let formatted = replacement.trimmingCharacters(in: .whitespacesAndNewlines)

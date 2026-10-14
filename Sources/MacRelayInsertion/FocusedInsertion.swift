@@ -38,6 +38,7 @@ public final class FocusedInsertion {
         return token
     }
     public func insert(_ text: String, token: UUID) async -> Acknowledgement.Status {
+        testDetails.removeValue(forKey: "insertionFailure")
         guard !busy else {
             testDetails["rejectionCheck"] = "insertion-busy"
             return .rejected
@@ -87,7 +88,8 @@ public final class FocusedInsertion {
         } catch {
             testDetails["insertionStage"] = "rejected-before-paste"
             testDetails["insertionFailure"] =
-                error is AutomationError ? error.localizedDescription : "field-check-failed"
+                error is AutomationError || error is RelayError
+                ? error.localizedDescription : "The focused field could not be checked safely."
             return .rejected
         }
     }

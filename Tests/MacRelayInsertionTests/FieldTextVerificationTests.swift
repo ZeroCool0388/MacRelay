@@ -23,6 +23,17 @@ import Testing
         #expect(!check.matches(value: "A🏌️\nB", fullRangeText: "🏌️\n"))
         #expect(!check.matches(value: "A🏌️\nB", fullRangeText: "A🏌️\nB🏌️\n"))
     }
+    @Test func identicalReplacementIsRefusedBeforeItCanConfirmAQueuedPaste() throws {
+        let bodies: [String?] = [nil, "Sample"]
+        for fullRangeText in bodies {
+            #expect(throws: RelayError.insertionRejected) {
+                try FieldTextVerification(
+                    value: "Sample", fullRangeText: fullRangeText,
+                    selection: NSRange(location: 0, length: 6), inserting: "Sample",
+                    appBundleIdentifier: "com.openai.codex")
+            }
+        }
+    }
 
     @Test func nativeValueReaderRemainsExactWhenRangeAPIIsUnavailable() throws {
         let check = try FieldTextVerification(

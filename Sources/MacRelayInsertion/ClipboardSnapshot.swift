@@ -1,17 +1,24 @@
 import AppKit
 
-/// Complete, bounded in-memory snapshot. Never touches clipboard history or disk.
+/// Snapshot only an empty or plain-text-only clipboard. Never load binary or rich-text flavors.
+/// The 8 MiB limit applies to retained text data, not its initial pasteboard allocation.
 @MainActor
 struct ClipboardSnapshot {
     private let items: [[NSPasteboard.PasteboardType: Data]]
     let changeCount: Int
     init(_ pasteboard: NSPasteboard) throws {
         changeCount = pasteboard.changeCount
+        let offered = (pasteboard.pasteboardItems ?? []).map { (item: $0, types: $0.types) }
+        // Preflight every item before requesting any data, including lazily provided flavors.
+        // A retained temporary-insertion marker also refuses a new, possibly overlapping paste.
+        guard offered.allSatisfy({ $0.types.allSatisfy { $0 == .string } }) else {
+            throw AutomationError.clipboardUnsupported
+        }
         var result: [[NSPasteboard.PasteboardType: Data]] = []
         var total = 0
-        for item in pasteboard.pasteboardItems ?? [] {
+        for (item, types) in offered {
             var values: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types {
+            for type in types {
                 guard let data = item.data(forType: type) else { throw AutomationError.clipboardUnavailable }
                 total += data.count
                 guard total <= 8 * 1024 * 1024 else { throw AutomationError.clipboardUnavailable }

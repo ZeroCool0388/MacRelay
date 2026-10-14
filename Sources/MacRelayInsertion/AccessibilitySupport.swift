@@ -70,7 +70,8 @@ public enum AccessibilitySupport {
 }
 
 public enum AutomationError: Error, LocalizedError {
-    case permission, clipboardUnavailable, clipboardChanged, noField, protectedField, focusChanged
+    case permission, clipboardUnavailable, clipboardUnsupported, clipboardChanged, noField, protectedField,
+        focusChanged
     case guardUnavailable, screenSharing, wisprNotRunning, noFreshDictation, receiverUpgrade
     case unrecognizedPaste, screenSharingWindowUnavailable, screenSharingNameMismatch,
         screenSharingWindowChanged
@@ -81,6 +82,9 @@ public enum AutomationError: Error, LocalizedError {
                 "Allow MacRelay in Privacy & Security → Accessibility (Device Control and Data Access on newer macOS), then enable automatic mode again."
         case .clipboardUnavailable:
             return "The mini's clipboard could not be preserved. Nothing was inserted."
+        case .clipboardUnsupported:
+            return
+                "Automatic insertion needs an empty or plain-text-only clipboard on the mini. Check any pending paste, then copy plain text and try again. Nothing was inserted."
         case .clipboardChanged: return "The clipboard changed. Insertion was stopped."
         case .noField:
             return "Click into an editable text field on the mini. This field could not be checked safely."

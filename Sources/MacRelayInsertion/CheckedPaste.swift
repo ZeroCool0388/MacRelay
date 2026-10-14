@@ -32,7 +32,7 @@ enum CheckedPaste {
         let owned = pasteboard.changeCount
         var mayRestore = true
         defer {
-            if pasteboard.data(forType: ownerType) == owner {
+            if pasteboard.changeCount == owned, pasteboard.data(forType: ownerType) == owner {
                 report(
                     "clipboardRestored",
                     String(mayRestore && snapshot.restore(pasteboard, ifUnchanged: owned)))
