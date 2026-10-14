@@ -45,9 +45,26 @@ public struct WisprCursor {
             }
         }
     }
-    /// Never choose between multiple possible dictations. Require completed, stable text.
+    /// With paste evidence, require one matching completed record, then stable text.
+    /// Without evidence, retain the stricter single-candidate rule.
     public func ready(matchingDigest: Data? = nil, now: Date = Date()) throws -> WisprRecord? {
         let possible = candidates.values.filter { now.timeIntervalSince($0.seen) < 60 }
+        if let matchingDigest {
+            var matching: [Candidate] = []
+            for candidate in possible
+            where candidate.record.app == WisprStore.targetApp
+                && candidate.record.status == "formatted"
+            {
+                guard let text = candidate.record.text else { throw RelayError.invalidText }
+                try TextPolicy.validate(text)
+                if Data(SHA256.hash(data: Data(text.utf8))) == matchingDigest { matching.append(candidate) }
+            }
+            guard matching.count <= 1 else { throw RelayError.insertionRejected }
+            guard let candidate = matching.first, now.timeIntervalSince(candidate.changed) >= 0.25 else {
+                return nil
+            }
+            return candidate.record
+        }
         guard possible.count <= 1 else { throw RelayError.insertionRejected }
         guard let candidate = possible.first,
             candidate.record.app == WisprStore.targetApp,
@@ -56,13 +73,33 @@ public struct WisprCursor {
         else { return nil }
         guard let text = candidate.record.text else { throw RelayError.invalidText }
         try TextPolicy.validate(text)
-        if let matchingDigest, Data(SHA256.hash(data: Data(text.utf8))) != matchingDigest { return nil }
         return candidate.record
     }
     public mutating func consume(_ record: WisprRecord) {
-        candidates.removeValue(forKey: record.rowID)
-        usedEntities.append(record.entityID)
+        // A matched paste establishes progress. Older pending entries must not later become
+        // eligible for another utterance or trigger an unguarded-completion stop.
+        let retired = candidates.values.filter { $0.record.rowID <= record.rowID }.map { $0.record.entityID }
+        candidates = candidates.filter { $0.key > record.rowID }
+        for entity in retired + [record.entityID] where !usedEntities.contains(entity) {
+            usedEntities.append(entity)
+        }
         if usedEntities.count > 64 { usedEntities.removeFirst(usedEntities.count - 64) }
+    }
+    /// Counts only; never exposes words, entity IDs, row IDs or fingerprints.
+    public func selectionDetails(matchingDigest: Data, now: Date = Date()) -> [String: String] {
+        let pending = candidates.values.filter { now.timeIntervalSince($0.seen) < 60 }
+        let finished = pending.filter {
+            $0.record.app == WisprStore.targetApp && $0.record.status == "formatted"
+        }
+        let matched = finished.filter {
+            guard let text = $0.record.text, (try? TextPolicy.validate(text)) != nil else { return false }
+            return Data(SHA256.hash(data: Data(text.utf8))) == matchingDigest
+        }
+        return [
+            "dictationPendingCount": String(pending.count),
+            "dictationFinishedCount": String(finished.count),
+            "dictationMatchingCount": String(matched.count),
+        ]
     }
     public mutating func discardCandidates() { candidates.removeAll() }
 }

@@ -429,7 +429,7 @@ final class RelayModel: ObservableObject {
         report["purpose"] =
             "Automatic relay test metadata only. No dictation, field contents, clipboard, pairing keys, audio or login details."
         report["role"] = role.rawValue
-        report["version"] = "0.2.5-experimental"
+        report["version"] = "0.2.6-experimental"
         report["status"] = status
         report["automaticEnabled"] = String(automaticEnabled)
         if role == .sender {

@@ -172,11 +172,18 @@ final class AutomaticWisprRelay {
         blockedCount += 1
         guard task == nil, let endpoint, let pairing else {
             // Never associate a later dictation with an earlier reservation.
+            observations["failureCheck"] = "overlapping-paste-or-missing-pairing"
             fail(RelayError.insertionRejected)
             return
         }
+        for key in [
+            "failureCheck", "dictationPendingCount", "dictationFinishedCount", "dictationMatchingCount",
+        ] {
+            observations.removeValue(forKey: key)
+        }
         let run = self.run
         waitingForSource = true
+        observations["transferStage"] = "checking-source"
         onStatus?("Wispr paste stopped. Checking the Screen Sharing window…")
         task = Task { [weak self] in
             guard let self else { return }
@@ -206,16 +213,26 @@ final class AutomaticWisprRelay {
                 self.poll()
                 guard self.run == run else { return }
                 self.onStatus?("Screen Sharing window checked. Checking the mini's field…")
+                self.observations["transferStage"] = "arming-receiver"
                 let armed = try await self.sender.send(
                     Transfer(armID: UUID()), to: endpoint, pairing: pairing)
                 guard let token = armed.token else { throw RelayError.acknowledgementMismatch }
+                self.observations["transferStage"] = "matching-dictation"
                 let deadline = Date().addingTimeInterval(5)
                 var record: WisprRecord?
                 while record == nil {
                     guard self.run == run, !Task.isCancelled, destination.isCurrent(), Date() < deadline,
                         self.guardTap.isHealthy
                     else { throw AutomationError.noFreshDictation }
-                    record = try self.cursor?.ready(matchingDigest: evidence)
+                    if let details = self.cursor?.selectionDetails(matchingDigest: evidence) {
+                        self.observations.merge(details, uniquingKeysWith: { _, new in new })
+                    }
+                    do {
+                        record = try self.cursor?.ready(matchingDigest: evidence)
+                    } catch {
+                        self.observations["failureCheck"] = "fresh-record-selection"
+                        throw error
+                    }
                     if record == nil { try await Task.sleep(nanoseconds: 50_000_000) }
                 }
                 guard self.run == run, !Task.isCancelled, destination.isCurrent(),
@@ -223,10 +240,12 @@ final class AutomaticWisprRelay {
                 else { throw AutomationError.focusChanged }
                 // Remove before sending. An uncertain insertion must never be attempted again.
                 self.cursor?.consume(record)
+                self.observations["transferStage"] = "sending-insertion"
                 _ = try await self.sender.send(
                     Transfer(inserting: text, token: token), to: endpoint, pairing: pairing)
                 guard self.run == run else { return }
                 self.insertedCount += 1
+                self.observations["transferStage"] = "confirmed"
                 self.onStatus?(
                     "Dictation inserted on the mini. \(self.insertedCount) confirmed; \(self.blockedCount) Wispr paste attempts stopped."
                 )
@@ -256,7 +275,14 @@ final class AutomaticWisprRelay {
     private func fail(_ error: Error) {
         stop()
         let message: String
-        if error is AutomationError || error is WisprStoreError || error is RelayError {
+        if error as? RelayError == .insertionRejected,
+            observations["failureCheck"] == "fresh-record-selection"
+        {
+            message = "More than one new Wispr dictation matches this paste. Delivery was stopped."
+        } else if observations["failureCheck"] == "overlapping-paste-or-missing-pairing" {
+            message =
+                "Another Wispr paste arrived before the previous delivery finished. Delivery was stopped."
+        } else if error is AutomationError || error is WisprStoreError || error is RelayError {
             message = error.localizedDescription
         } else {
             message =

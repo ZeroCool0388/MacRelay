@@ -113,6 +113,105 @@ private final class Fixture {
         #expect(cursor.pendingIDs.isEmpty)
         #expect(cursor.watermark == 20)
     }
+    @Test func pasteEvidenceSelectsOnlyOneMatchingStableCompletion() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var cursor = WisprCursor(baseline: 0)
+        let unfinished = WisprRecord(
+            rowID: 1, entityID: "unfinished", app: "", status: "processing", text: nil)
+        let unrelated = WisprRecord(
+            rowID: 2, entityID: "different", app: WisprStore.targetApp,
+            status: "formatted", text: "Different words")
+        let matched = WisprRecord(
+            rowID: 3, entityID: "matched", app: WisprStore.targetApp,
+            status: "formatted", text: "Fresh words")
+        let digest = Data(SHA256.hash(data: Data("Fresh words".utf8)))
+        try cursor.observe([unfinished, unrelated], eligible: true, now: now)
+        try cursor.observe([matched], eligible: true, now: now.addingTimeInterval(1))
+        #expect(throws: RelayError.insertionRejected) {
+            try cursor.ready(now: now.addingTimeInterval(1.3))
+        }
+        #expect(try cursor.ready(matchingDigest: digest, now: now.addingTimeInterval(1.1)) == nil)
+        #expect(try cursor.ready(matchingDigest: digest, now: now.addingTimeInterval(1.3)) == matched)
+        #expect(
+            cursor.selectionDetails(matchingDigest: digest, now: now.addingTimeInterval(1.3)) == [
+                "dictationPendingCount": "3", "dictationFinishedCount": "2", "dictationMatchingCount": "1",
+            ])
+    }
+    @Test func duplicatePasteMatchesAreRefusedEvenWhenOneIsNotStable() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var cursor = WisprCursor(baseline: 0)
+        let first = WisprRecord(
+            rowID: 1, entityID: "first", app: WisprStore.targetApp, status: "formatted", text: "Same words")
+        let second = WisprRecord(
+            rowID: 2, entityID: "second", app: WisprStore.targetApp, status: "formatted", text: "Same words")
+        let digest = Data(SHA256.hash(data: Data("Same words".utf8)))
+        try cursor.observe([first], eligible: true, now: now)
+        try cursor.observe([second], eligible: true, now: now.addingTimeInterval(1))
+        #expect(throws: RelayError.insertionRejected) {
+            try cursor.ready(matchingDigest: digest, now: now.addingTimeInterval(1.1))
+        }
+        #expect(throws: RelayError.insertionRejected) {
+            try cursor.ready(matchingDigest: digest, now: now.addingTimeInterval(1.3))
+        }
+    }
+    @Test func consumingMatchRetiresOlderEntriesAndPreservesNewerOnes() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var cursor = WisprCursor(baseline: 0)
+        let old = WisprRecord(rowID: 1, entityID: "old", app: "", status: "processing", text: nil)
+        let first = WisprRecord(
+            rowID: 2, entityID: "first", app: WisprStore.targetApp, status: "formatted", text: "First")
+        let later = WisprRecord(rowID: 3, entityID: "later", app: "", status: "processing", text: nil)
+        try cursor.observe([old, first, later], eligible: true, now: now)
+        cursor.consume(first)
+        #expect(cursor.pendingIDs == [3])
+        let reused = WisprRecord(
+            rowID: 4, entityID: "old", app: WisprStore.targetApp, status: "formatted", text: "Old words")
+        try cursor.observe([reused], eligible: true, now: now.addingTimeInterval(1))
+        #expect(cursor.pendingIDs == [3])
+        #expect(!cursor.hasUnguardedCompletion(now: now.addingTimeInterval(6)))
+    }
+    @Test func twoDatabaseDictationsConfirmWithoutReplayingLateOlderEntries() throws {
+        let fixture = try Fixture()
+        try fixture.execute(
+            "INSERT INTO History VALUES ('baseline', 'com.apple.ScreenSharing', 'formatted', 'Earlier', NULL)"
+        )
+        let store = try WisprStore(url: fixture.url)
+        var cursor = WisprCursor(baseline: store.baseline)
+        let now = Date(timeIntervalSince1970: 1000)
+        try fixture.execute("INSERT INTO History VALUES ('late', '', 'processing', NULL, NULL)")
+        try fixture.execute(
+            "INSERT INTO History VALUES ('first', 'com.apple.ScreenSharing', 'formatted', 'First sentence.', NULL)"
+        )
+        try cursor.observe(
+            store.records(after: cursor.watermark, pending: cursor.pendingIDs), eligible: true, now: now)
+        let firstHash = Data(SHA256.hash(data: Data("First sentence.".utf8)))
+        let first = try #require(
+            try cursor.ready(matchingDigest: firstHash, now: now.addingTimeInterval(0.3)))
+        cursor.consume(first)
+        try fixture.execute(
+            "UPDATE History SET app='com.apple.ScreenSharing', status='formatted', formattedText='Late older words' WHERE transcriptEntityId='late'"
+        )
+        try fixture.execute("INSERT INTO History VALUES ('second', '', 'processing', NULL, NULL)")
+        try cursor.observe(
+            store.records(after: cursor.watermark, pending: cursor.pendingIDs), eligible: true,
+            now: now.addingTimeInterval(1))
+        try fixture.execute(
+            "UPDATE History SET app='com.apple.ScreenSharing', status='formatted', pastedText='Second sentence.' WHERE transcriptEntityId='second'"
+        )
+        try cursor.observe(
+            store.records(after: cursor.watermark, pending: cursor.pendingIDs), eligible: true,
+            now: now.addingTimeInterval(2))
+        let secondHash = Data(SHA256.hash(data: Data("Second sentence.".utf8)))
+        #expect(try cursor.ready(matchingDigest: secondHash, now: now.addingTimeInterval(2.1)) == nil)
+        let second = try #require(
+            try cursor.ready(matchingDigest: secondHash, now: now.addingTimeInterval(2.3)))
+        #expect(second.rowID > first.rowID)
+        cursor.consume(second)
+        #expect(cursor.pendingIDs.isEmpty)
+        #expect(try cursor.ready(matchingDigest: firstHash, now: now.addingTimeInterval(3)) == nil)
+        #expect(try cursor.ready(matchingDigest: secondHash, now: now.addingTimeInterval(3)) == nil)
+        #expect(!cursor.hasUnguardedCompletion(now: now.addingTimeInterval(10)))
+    }
     @Test func ambiguityAndMissingFinalTextNeverSend() throws {
         let now = Date(timeIntervalSince1970: 1000)
         var cursor = WisprCursor(baseline: 0)

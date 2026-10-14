@@ -35,7 +35,20 @@ public final class FocusedInsertion {
         return token
     }
     public func insert(_ text: String, token: UUID) async -> Acknowledgement.Status {
-        guard !busy, permit.consume(token), let target = destination else { return .rejected }
+        guard !busy else {
+            testDetails["rejectionCheck"] = "insertion-busy"
+            return .rejected
+        }
+        guard permit.consume(token) else {
+            testDetails["insertionStage"] = "rejected-before-paste"
+            testDetails["rejectionCheck"] = "invalid-or-expired-token"
+            return .rejected
+        }
+        guard let target = destination else {
+            testDetails["insertionStage"] = "rejected-before-paste"
+            testDetails["rejectionCheck"] = "reservation-cleared"
+            return .rejected
+        }
         destination = nil
         busy = true
         defer { busy = false }
