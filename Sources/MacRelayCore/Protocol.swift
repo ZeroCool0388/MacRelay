@@ -4,6 +4,7 @@ import Foundation
 public enum RelayError: Error, LocalizedError, Equatable {
     case invalidPairingCode, authenticationFailed, invalidMessage, invalidFrame, invalidText
     case disconnected, timedOut, busy, acknowledgementMismatch
+    case insertionRejected, insertionUnconfirmed
 
     public var errorDescription: String? {
         switch self {
@@ -20,6 +21,11 @@ public enum RelayError: Error, LocalizedError, Equatable {
         case .busy: return "The receiver already has text waiting. Copy or discard it before sending again."
         case .acknowledgementMismatch:
             return "Delivery acknowledgement could not be verified. Check the receiver."
+        case .insertionRejected:
+            return "Insertion was stopped. Check the mini's focused field and automatic mode."
+        case .insertionUnconfirmed:
+            return
+                "Insertion was attempted but could not be confirmed. Check the field before dictating again."
         }
     }
 }
@@ -142,43 +148,81 @@ private func derive(
 }
 
 public struct Transfer: Codable, Equatable {
-    public enum Kind: String, Codable { case text, probe }
+    public enum Kind: String, Codable { case text, probe, arm, insert }
     public let id: UUID
     public let kind: Kind
     public let text: String?
+    public let token: UUID?
     public init(text: String) throws {
         try TextPolicy.validate(text)
         id = UUID()
         kind = .text
         self.text = text
+        token = nil
     }
     public init(probeID: UUID = UUID()) {
         id = probeID
         kind = .probe
         text = nil
+        token = nil
+    }
+    public init(armID: UUID) {
+        id = armID
+        kind = .arm
+        text = nil
+        token = nil
+    }
+    public init(inserting text: String, token: UUID) throws {
+        try TextPolicy.validate(text)
+        id = UUID()
+        kind = .insert
+        self.text = text
+        self.token = token
     }
     public func validate() throws {
         switch kind {
         case .text:
-            guard let text else { throw RelayError.invalidMessage }
+            guard let text, token == nil else { throw RelayError.invalidMessage }
             try TextPolicy.validate(text)
-        case .probe:
-            guard text == nil else { throw RelayError.invalidMessage }
+        case .probe, .arm:
+            guard text == nil, token == nil else { throw RelayError.invalidMessage }
+        case .insert:
+            guard let text, token != nil else { throw RelayError.invalidMessage }
+            try TextPolicy.validate(text)
         }
     }
 }
 public struct Acknowledgement: Codable, Equatable {
-    public enum Status: String, Codable { case accepted, busy, paired }
+    public enum Status: String, Codable {
+        case accepted, busy, paired, armed, inserted, rejected, unconfirmed
+    }
     public let id: UUID
     public let status: Status
-    public init(id: UUID, status: Status) {
+    public let token: UUID?
+    public let capabilities: [String]?
+    public let receiverNames: [String]?
+    public static let automaticInsertion = "wispr-insertion-v1"
+    public init(
+        id: UUID, status: Status, token: UUID? = nil, capabilities: [String]? = nil,
+        receiverNames: [String]? = nil
+    ) {
         self.id = id
         self.status = status
+        self.token = token
+        self.capabilities = capabilities
+        self.receiverNames = receiverNames
     }
     public func validate(for transfer: Transfer) throws {
         guard id == transfer.id else { throw RelayError.acknowledgementMismatch }
         switch (transfer.kind, status) {
-        case (.probe, .paired), (.text, .accepted): return
+        case (.probe, .paired), (.text, .accepted), (.insert, .inserted):
+            guard token == nil else { throw RelayError.acknowledgementMismatch }
+            return
+        case (.arm, .armed):
+            guard token != nil else { throw RelayError.acknowledgementMismatch }
+            return
+        case (.arm, .rejected), (.insert, .rejected): throw RelayError.insertionRejected
+        case (.insert, .unconfirmed): throw RelayError.insertionUnconfirmed
         case (.text, .busy): throw RelayError.busy
         default: throw RelayError.acknowledgementMismatch
         }

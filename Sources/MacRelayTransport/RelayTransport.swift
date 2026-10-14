@@ -121,7 +121,7 @@ public final class RelayReceiver {
     private var generation = UUID()
     public var onState: ((String) -> Void)?
     public var onReady: ((UInt16) -> Void)?
-    public var onTransfer: ((Transfer) throws -> Acknowledgement)?
+    public var onTransfer: ((Transfer) async throws -> Acknowledgement)?
 
     public init() {}
     public func start(pairing: PairingKey, port: UInt16 = defaultPort, advertise: Bool = true) throws {
@@ -140,7 +140,7 @@ public final class RelayReceiver {
                 guard let self, self.generation == run else { return }
                 switch state {
                 case .ready:
-                    self.onState?("Listening — incoming text will wait for Copy")
+                    self.onState?("Receiver is listening.")
                     if let port = listener?.port?.rawValue { self.onReady?(port) }
                 case .failed:
                     self.stop()
@@ -179,7 +179,7 @@ public final class RelayReceiver {
                         guard let self, self.generation == run, !Task.isCancelled,
                             let handler = self.onTransfer
                         else { throw RelayError.disconnected }
-                        let ack = try handler(transfer)
+                        let ack = try await handler(transfer)
                         try await channel.send(keys.sealAcknowledgement(ack))
                     } catch {
                         // No payloads, pairing codes, network endpoints or raw errors in logs.

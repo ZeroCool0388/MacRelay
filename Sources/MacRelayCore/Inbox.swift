@@ -10,6 +10,7 @@ public struct Inbox {
         try transfer.validate()
         expire(now: now)
         if transfer.kind == .probe { return Acknowledgement(id: transfer.id, status: .paired) }
+        guard transfer.kind == .text else { throw RelayError.invalidMessage }
         guard text == nil else { return Acknowledgement(id: transfer.id, status: .busy) }
         text = transfer.text
         expiresAt = now.addingTimeInterval(Self.lifetime)

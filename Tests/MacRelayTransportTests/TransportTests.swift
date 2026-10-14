@@ -15,7 +15,9 @@ struct TransportTests {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
     }
-    private func listeningReceiver(key: PairingKey, handler: @escaping (Transfer) throws -> Acknowledgement)
+    private func listeningReceiver(
+        key: PairingKey, handler: @escaping (Transfer) async throws -> Acknowledgement
+    )
         async throws -> (RelayReceiver, NWEndpoint)
     {
         let receiver = RelayReceiver()
@@ -53,6 +55,44 @@ struct TransportTests {
         inbox.clear()
         _ = try await sender.send(Transfer(text: "after discard"), to: endpoint, pairing: key)
         #expect(inbox.text == "after discard")
+    }
+
+    @Test
+    func automaticReservationCommitAndReplayUseAuthenticatedConnections() async throws {
+        let key = PairingKey()
+        var permit = InsertionPermit()
+        var insertionCount = 0
+        let (receiver, endpoint) = try await listeningReceiver(key: key) { transfer in
+            switch transfer.kind {
+            case .probe:
+                return Acknowledgement(
+                    id: transfer.id, status: .paired,
+                    capabilities: [Acknowledgement.automaticInsertion], receiverNames: ["Test Mac"])
+            case .arm:
+                return Acknowledgement(id: transfer.id, status: .armed, token: try permit.arm())
+            case .insert:
+                guard let token = transfer.token, permit.consume(token) else {
+                    return Acknowledgement(id: transfer.id, status: .rejected)
+                }
+                try await Task.sleep(nanoseconds: 20_000_000)
+                insertionCount += 1
+                return Acknowledgement(id: transfer.id, status: .inserted)
+            case .text: return Acknowledgement(id: transfer.id, status: .busy)
+            }
+        }
+        defer { receiver.stop() }
+        let sender = RelaySender()
+        let probe = try await sender.send(Transfer(), to: endpoint, pairing: key)
+        #expect(probe.capabilities == [Acknowledgement.automaticInsertion])
+        #expect(probe.receiverNames == ["Test Mac"])
+        let arm = try await sender.send(Transfer(armID: UUID()), to: endpoint, pairing: key)
+        let token = try #require(arm.token)
+        let insert = try Transfer(inserting: "new dictation", token: token)
+        #expect(try await sender.send(insert, to: endpoint, pairing: key).status == .inserted)
+        await #expect(throws: RelayError.insertionRejected) {
+            _ = try await sender.send(insert, to: endpoint, pairing: key)
+        }
+        #expect(insertionCount == 1)
     }
 
     @Test
@@ -176,11 +216,17 @@ struct BonjourTests {
         }
         // Pairing authentication identifies our listener even if another MacRelay is advertised.
         var authenticated = false
-        for device in devices {
-            if let ack = try? await RelaySender().send(Transfer(), to: device.endpoint, pairing: key) {
-                authenticated = ack.status == .paired
-                if authenticated { break }
+        var tried = Set<String>()
+        // An already-running receiver may appear before our new advertisement arrives.
+        while !authenticated, Date() < deadline {
+            for device in devices where !tried.contains(device.id) {
+                tried.insert(device.id)
+                if let ack = try? await RelaySender().send(Transfer(), to: device.endpoint, pairing: key) {
+                    authenticated = ack.status == .paired
+                    if authenticated { break }
+                }
             }
+            if !authenticated { try await Task.sleep(nanoseconds: 20_000_000) }
         }
         #expect(authenticated)
     }

@@ -1,34 +1,35 @@
 # Roadmap
 
-## v0.1: explicit transfer
+## Primary goal: seamless Wispr dictation
 
-Sender and receiver in one menu bar app. Private pairing, direct encrypted transfer, Bonjour with a local address fallback, global send/copy shortcuts, and one temporary waiting item. No saved text history or automatic clipboard writes.
+Dictate normally on the MacBook while using Screen Sharing. The words appear once in the mini’s focused text field, without an extra send, copy or paste action.
 
-Before calling this ready for everyday use, finish the two-Mac checklist in [VALIDATION.md](VALIDATION.md).
+The manual v0.1 established pairing and local transfer. It does not solve this goal by itself.
 
-## v0.2: easier setup
+## v0.2 experimental: automatic local adapter
 
-- Review the security protocol independently before broader distribution.
-- Add clear, tested reconnect behaviour and visible receiver health.
-- Make shortcuts configurable and test their routing through Screen Sharing.
-- Add a better first-run guide and a way to forget pairing keys.
-- Build signed, notarized downloads for Apple Silicon and Intel.
-- Improve the pairing experience without falling back to a guessable PIN or unauthenticated discovery.
+Implemented for testing:
 
-## Wispr Flow: verify first
+- Read-only access to new, completed Wispr records, with an enable-time baseline.
+- A narrow blocker for Wispr-generated paste events in Screen Sharing.
+- One Screen Sharing session, checked against the paired receiver’s name.
+- Authenticated, short-lived, one-use field reservations.
+- Focus, value and selection checks before insertion; result verification afterward.
+- Direct Accessibility insertion, with guarded clipboard restoration when paste is needed.
+- Metadata-only test reports, no saved text history and no uncertain-delivery retries.
 
-Check current official Wispr documentation and test the supported ways of obtaining the latest transcription. Do not assume there is an API, stable history-file format, completion event, or reliable shortcut.
+The Wispr database layout and event behaviour are undocumented. Schema metadata was checked against Wispr Flow 1.6.1147; actual dictation and event filtering still need the two-Mac check in [VALIDATION.md](VALIDATION.md). No official Wispr integration is claimed.
 
-Start with a user-triggered capture only if it can be verified. Test clipboard restoration, old transcriptions, rapid consecutive dictations, focus changes, and Screen Sharing. Show clearly when capture fails. Never send an old clipboard item silently.
+## Next gates
 
-Automatic capture should be opt-in and use a supported completion signal. Avoid continuous clipboard watching and reading private application databases as a default integration.
+1. Prove the actual microphone → Wispr → Screen Sharing → mini field path, with native paste blocked and clipboard sync off.
+2. Test rapid dictations, changed focus/selection, ordinary user paste, Unicode, disconnection and Wispr restart/update.
+3. Test supported everyday apps individually. Keep unsupported fields blocked rather than inserting blindly.
+4. Investigate an official completion signal/API with Wispr. Replace the local adapter if a reliable supported interface becomes available.
+5. Improve first setup, connection health and permission guidance after the core dictation path works.
 
-## Seamless insertion: opt in
+## Before broader distribution
 
-After capture is reliable, explore inserting into a chosen receiver app. This will need an explicit mode, destination checks, a clear failure state, and any required Accessibility permission. If the app uses the clipboard temporarily, restore it only when no other app has changed it in the meantime.
+Independent security review; signed and notarized Apple Silicon/Intel downloads; clearer pairing/revocation; a supported-app compatibility list. Configurable two-key shortcuts may improve the manual fallback, but are not a substitute for seamless dictation.
 
-Never paste or type into an unknown field, run shell commands, or submit a form as part of text delivery. Keep the v0.1 manual copy-and-paste route available.
-
-## Later
-
-Consider deliberate remote-network support only after local use is proven. Any VPN option needs a reviewed trust model, explicit setup, and tests. No cloud transcription or persistent text archive is planned.
+Remote-network support is later work. No cloud relay or persistent MacRelay transcript archive is planned.

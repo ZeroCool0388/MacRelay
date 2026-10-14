@@ -23,11 +23,11 @@ Preview buttons that would create a connection or copy text are inactive. Quit t
 ## Keep these rules
 
 - No transferred text or pairing secrets in logs, preferences, files, fixtures from real users, or issue reports.
-- Receiving must not change the clipboard. Sending and copying must remain explicit actions.
+- Manual receiving must not change the clipboard. Automatic insertion must require explicit opt-in, a checked destination and safe temporary clipboard restoration if paste is needed.
 - Do not replace an unexpired pending item. Do not retry an unconfirmed transfer automatically.
 - Authenticate the receiver before transmitting text, and the sender before accepting it.
 - Keep frames, text sizes, connections, and deadlines bounded.
-- Do not add a Wispr integration claim without an official source and a reproducible check.
+- Label undocumented adapters as experimental. Do not claim an official Wispr integration without an official source, or a working live path without a reproducible two-Mac check.
 
 ## Before a pull request
 

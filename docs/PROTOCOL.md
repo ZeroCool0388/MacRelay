@@ -29,8 +29,8 @@ Both sides perform X25519 agreement. They derive two 32-byte keys using HKDF-SHA
 
 ## Encrypted records
 
-5. Sender → receiver: AES-GCM combined representation of JSON `Transfer {id, kind, text}` under the transfer key. Associated data is `SHA256(T) || "transfer"`.
-6. Receiver → sender: AES-GCM combined representation of JSON `Acknowledgement {id, status}` under the acknowledgement key. Associated data is `SHA256(T) || "ack"`.
+5. Sender → receiver: AES-GCM combined representation of JSON `Transfer {id, kind, text?, token?}` under the transfer key. Associated data is `SHA256(T) || "transfer"`.
+6. Receiver → sender: AES-GCM combined representation of JSON `Acknowledgement {id, status, token?, capabilities?, receiverNames?}` under the acknowledgement key. Associated data is `SHA256(T) || "ack"`.
 
 CryptoKit's combined representation contains the random 12-byte nonce, ciphertext, and 16-byte tag. Each encryption chooses a new nonce. The sender verifies the acknowledgement ID and its allowed status for the transfer kind.
 
@@ -39,9 +39,18 @@ Kinds:
 - `probe`: `text` must be absent. Receiver responds `paired`; it does not change a live pending item or extend its expiry.
 - `text`: `text` must be non-empty and at most 65,536 UTF-8 bytes. Receiver responds `accepted` only after placing it in the volatile inbox, or `busy` if an unexpired item is already waiting.
 
+Experimental optional kinds:
+
+- `arm`: no text or token. With automatic insertion enabled, reserve the checked focused field and return `armed` with a fresh UUID token. Otherwise return `rejected`.
+- `insert`: non-empty validated text plus the reservation token. Consume a matching unexpired token **before** attempting insertion; check the destination again. Return `inserted` only after field-value verification, `rejected` when refused before an attempt, or `unconfirmed` after an unverified attempt.
+
+New receivers advertise `wispr-insertion-v1` in a `paired` acknowledgement only when automatic insertion is enabled and Accessibility is available. Optional receiver names let the sender check its Screen Sharing window. These values are encrypted. Existing v0.1 probes/clipboard messages remain compatible; old receivers do not advertise the capability, so new senders refuse automatic mode. Unknown kinds are rejected.
+
+Reservations last 15 seconds. One reservation and one insertion may be live. Tokens and field fingerprints are never persisted. No automatic retry follows a rejected or uncertain result; enabling again establishes a new Wispr baseline.
+
 A connection reads only one encrypted transfer. It closes after acknowledgement or error. The receiver must never accept an encrypted transfer twice on the same connection. Cross-session ciphertext and client-proof replay fail because the challenge, ephemeral key pairs, and derived keys change.
 
-The inbox expires after 120 seconds and clears on explicit copy/discard, receiver stop, role switch, or app exit. There is no automatic resend. Successful acknowledgement proves receipt into memory, not that the text has been copied or inserted into another app.
+The inbox expires after 120 seconds and clears on explicit copy/discard, receiver stop, role switch, or app exit. There is no automatic resend. For manual `text`, successful acknowledgement proves receipt into memory. For `insert`, `inserted` means the exposed field value matched the expected single insertion; it does not mean a form was submitted.
 
 ## Code map
 

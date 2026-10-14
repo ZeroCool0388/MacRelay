@@ -1,12 +1,12 @@
 # Security
 
-MacRelay v0.1 is a development build. Its protocol has automated checks, but has not had an independent security audit.
+MacRelay is a development build; v0.2 automatic mode is experimental. Its protocol has automated checks, but has not had an independent security audit.
 
 ## What it protects
 
 The pairing code contains a random 256-bit secret. Both Macs must prove they have that secret before the sender transmits text. Text and acknowledgements are encrypted. A nearby device advertising the same Bonjour name does not become trusted.
 
-Keys are saved as non-synchronizing, device-local Keychain items, accessible when the user's Keychain is unlocked. Receiver and sender keys use separate accounts. Text exists only in a single waiting slot and temporary transfer buffers; it is not written to app logs, files, preferences, or Keychain.
+Keys are saved as non-synchronizing, device-local Keychain items, accessible when the user's Keychain is unlocked. Receiver and sender keys use separate accounts. Text exists only in temporary dictation, field-verification and transfer buffers, or the manual waiting slot; it is not written to app logs, files, preferences, or Keychain.
 
 The app cannot prevent another program from reading an explicitly copied clipboard item. It cannot promise forensic removal of strings from RAM, swap, crash dumps, screenshots, or third-party clipboard history. Keychain and computer access remain part of the trust boundary.
 
@@ -33,6 +33,22 @@ Bonjour service names, addresses, packet lengths, and timing are visible to the 
 The receiver allows at most four concurrent connections, each with a ten-second deadline. Frames are bounded to 512 KiB, handshake records to 2 KiB, and text to 64 KiB in UTF-8. These limits bound work; they do not prevent denial of service by a hostile network peer.
 
 There is no persistent deduplication ledger. The one-message-per-session rule prevents network replay within a session, while fresh session keys prevent cross-session replay. If a valid sender deliberately sends the same text again after the waiting slot has cleared, it is a new transfer. Check the receiver after an unconfirmed delivery.
+
+## Automatic insertion
+
+Automatic mode is explicitly enabled on both Macs and starts off after relaunch. A receiver capability check prevents a new sender from treating a v0.1 receiver as an automatic inserter. Receiver names are carried only in authenticated encrypted acknowledgements, not Bonjour advertisements.
+
+The sender uses an undocumented Wispr database adapter opened with SQLite READONLY. It baselines the maximum row ID when enabled, reads bounded new-record metadata and completed bodies for Screen Sharing only, and ignores earlier transcript bodies. Records that appear outside the checked Screen Sharing window are skipped. Database replacement, schema mismatch, ambiguity and missing completed text stop delivery.
+
+The event blocker filters V events originating from currently running known Wispr bundle IDs while Screen Sharing is foreground. Other keyboard events pass through; they are not stored. A detected, blocked Wispr paste attempt is mandatory before relaying. At that event only, the sender hashes bounded plain clipboard text and requires the new completed Wispr record to match. The clipboard value is never used as the relay payload. A changed/empty clipboard, mismatch or ambiguous record refuses transfer; there is no general clipboard watcher. Unknown insertion paths do not trigger a relay. This is a compatibility guard, not a security boundary against another malicious local process. Real event-source behaviour still needs live validation.
+
+The receiver grants a random UUID token only after checking an editable non-protected field. It keeps a hash of that field’s text, its selection, app, window and field identity. A token expires after 15 seconds and is consumed before any insertion attempt. A mismatched focus, changed text/selection, expired or consumed token is refused. Stopping/role changes clear reservations. There is one live reservation and one insertion at a time.
+
+The sender never retries. The receiver attempts direct Accessibility insertion or, when that API is unavailable, one paste posted to the checked process. A failed direct write is not followed by paste. Password fields, unsupported fields and known terminal apps are refused; embedded terminals and unusual controls require separate compatibility review. The app never sends Enter. The operating system does not offer an atomic focus-check-and-write transaction, so final app behaviour remains part of the trust boundary.
+
+The clipboard fallback snapshots all offered item data in memory, up to 8 MiB. It adds a private marker to its temporary write and restores the snapshot only when both marker and change count still match. New clipboard writes are left alone. Clipboard managers or OS sharing may observe temporary clipboard contents even if they are later restored. Prefer direct insertion and disable Screen Sharing clipboard sync during validation.
+
+Test reports are written only when explicitly requested. They contain diagnostic counters, schema/permission results and status, never transferred text, field values, tokens or pairing secrets. Wispr’s own stored history and cloud processing settings remain unchanged.
 
 ## Reporting a vulnerability
 
