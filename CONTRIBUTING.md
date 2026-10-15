@@ -40,3 +40,7 @@ Use four-space indentation and existing Swift patterns. Keep dependency addition
 ## Reports
 
 Use the existing issue templates. Include app and macOS versions, processor architectures, sender and receiver roles, and reproducible steps with invented sample text. Do not include pairing codes, credentials or private transcriptions. Remove private device names and network addresses from reports. Follow [SECURITY.md](SECURITY.md) for vulnerabilities instead of posting exploit details publicly.
+
+## Reporting bugs
+
+Open an issue using the bug report template and include your macOS version and MacRelay version.
